@@ -14,6 +14,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -43,6 +44,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.atan2
@@ -115,19 +117,42 @@ class VirtualKeyState {
  */
 @Composable
 fun GameControls(keys: VirtualKeyState, modifier: Modifier = Modifier) {
-    Box(modifier) {
+    BoxWithConstraints(modifier) {
+        // Scale every control dimension off the smaller of width/height so the gamepad reads at the
+        // right size whether the parent is a landscape Overlay (whole screen) or a Stacked-portrait
+        // controls strip (narrow + tall). The min/max clamps stop controls from becoming tiny on
+        // phones or absurdly large on tablets.
+        //
+        // For reference, on a ~360dp-wide portrait phone in Stacked mode the strip's min dimension
+        // is ~360dp, giving joystick ~150dp and buttons ~79dp. Without the row-versus-column switch
+        // below, joystick (~150) + 3 buttons (~237) + paddings would still overflow 360, which was
+        // the original bug. The switch reroutes the buttons into a vertical column whenever the
+        // available width can't host both side-by-side with breathing room.
+        val ref = if (maxWidth < maxHeight) maxWidth else maxHeight
+        val joystickSize = (ref * 0.42f).coerceIn(140.dp, 200.dp)
+        val buttonSize   = (ref * 0.22f).coerceIn(56.dp, 80.dp)
+        val buttonGap    = buttonSize * 0.22f
+        val edgePad      = (ref * 0.05f).coerceIn(16.dp, 32.dp)
+        // Threshold: joystick + 3 buttons side-by-side + 2 gaps + 3 paddings. If that doesn't fit,
+        // stack the action buttons vertically so the joystick keeps its size and they stop colliding.
+        val rowActionsWidth = joystickSize + buttonSize * 3 + buttonGap * 2 + edgePad * 3
+        val verticalActions = rowActionsWidth > maxWidth
+
         Joystick(
             keys = keys,
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(32.dp)
-                .size(180.dp)
+                .padding(edgePad)
+                .size(joystickSize)
         )
         ActionButtons(
             keys = keys,
+            buttonSize = buttonSize,
+            gap = buttonGap,
+            vertical = verticalActions,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(32.dp)
+                .padding(edgePad)
         )
     }
 }
@@ -435,23 +460,44 @@ private fun newKeysForAngle(angleDeg: Double, cardinalHalfWidth: Double): Set<In
 // ===[ Action Buttons ]===
 
 @Composable
-private fun ActionButtons(keys: VirtualKeyState, modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        ActionButton("C", KEY_C, keys)
-        ActionButton("X", KEY_X, keys)
-        ActionButton("Z", KEY_Z, keys)  // Rightmost = primary action (Z confirms in Undertale/DR)
+private fun ActionButtons(
+    keys: VirtualKeyState,
+    buttonSize: Dp,
+    gap: Dp,
+    vertical: Boolean,
+    modifier: Modifier = Modifier
+) {
+    // Layout direction matters for the visual reading of "primary action goes last": in a Row the
+    // primary key (Z) sits rightmost; in a Column we want it bottommost so the thumb's resting
+    // position naturally falls on the most-used button. Same key order in source, different visual
+    // result based on `vertical`.
+    if (vertical) {
+        Column(
+            modifier = modifier,
+            verticalArrangement = Arrangement.spacedBy(gap)
+        ) {
+            ActionButton("C", KEY_C, keys, buttonSize)
+            ActionButton("X", KEY_X, keys, buttonSize)
+            ActionButton("Z", KEY_Z, keys, buttonSize)
+        }
+    } else {
+        Row(
+            modifier = modifier,
+            horizontalArrangement = Arrangement.spacedBy(gap)
+        ) {
+            ActionButton("C", KEY_C, keys, buttonSize)
+            ActionButton("X", KEY_X, keys, buttonSize)
+            ActionButton("Z", KEY_Z, keys, buttonSize)  // Rightmost = primary action (Z confirms in Undertale/DR)
+        }
     }
 }
 
 @Composable
-private fun ActionButton(label: String, keyCode: Int, keys: VirtualKeyState) {
+private fun ActionButton(label: String, keyCode: Int, keys: VirtualKeyState, size: Dp) {
     var pressed by remember { mutableStateOf(false) }
     Box(
         modifier = Modifier
-            .size(72.dp)
+            .size(size)
             .clip(CircleShape)
             .background(
                 if (pressed) Color.White.copy(alpha = 0.45f)
