@@ -39,7 +39,7 @@ fun ButterscotchAndroidTheme(
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
+    /* val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
@@ -47,7 +47,8 @@ fun ButterscotchAndroidTheme(
 
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
-    }
+    } */
+    val colorScheme = DarkColorScheme
 
     MaterialTheme(
         colorScheme = colorScheme,

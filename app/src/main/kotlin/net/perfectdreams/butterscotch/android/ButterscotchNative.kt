@@ -32,6 +32,24 @@ object ButterscotchNative {
 
     external fun init()
 
+    // ===[ DataWin handle API — safe to call from any thread, no EGL needed ]===
+    //
+    // Parses a WAD file into an opaque native handle. Callers own the handle and MUST call
+    // [dataWinFree] exactly once. Today this only parses GEN8 + STRG (enough for the importer);
+    // if a fuller parse is needed later, expose a separate entry point rather than overloading
+    // this one.
+    //
+    // Prefer the [ParsedDataWin] wrapper below over calling these externals directly — it handles
+    // freeing for you via [AutoCloseable].
+
+    /** Returns 0 on parse failure. */
+    external fun dataWinParseLight(wadPath: String): Long
+    external fun dataWinFree(handle: Long)
+    external fun dataWinName(handle: Long): String?
+    external fun dataWinDisplayName(handle: Long): String?
+    /** Returns -1 if the handle is 0. */
+    external fun dataWinWadVersion(handle: Long): Int
+
     // ===[ Render-side JNI — all must run on the EGL-owning thread ]===
 
     /** Parse data.win, build VM/renderer/audio, fire first room. Requires a current EGL context. */

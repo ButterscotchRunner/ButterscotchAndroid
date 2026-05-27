@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.ButterscotchAndroid" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.ButterscotchAndroid" parent="android:Theme.Material.NoActionBar">
+        <!-- Pinned dark so the Activity window matches the Compose dark theme. Prevents the white flash on cold start AND between NavHost destination transitions. -->
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
 </resources>

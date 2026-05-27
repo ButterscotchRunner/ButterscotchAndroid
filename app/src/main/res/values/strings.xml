@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">ButterscotchAndroid</string>
+    <string name="import_game_title">Add Game</string>
 </resources>

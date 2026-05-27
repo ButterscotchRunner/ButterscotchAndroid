@@ -1,6 +1,5 @@
 package net.perfectdreams.butterscotch.android
 
-import android.content.res.AssetManager
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -26,8 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.viewinterop.AndroidView
-import java.io.File
-import java.io.FileOutputStream
+import net.perfectdreams.butterscotch.android.library.GameLibrary
 
 /**
  * Hosts a [SurfaceView] that the native side draws into, with a Compose-based virtual gamepad
@@ -38,8 +36,9 @@ import java.io.FileOutputStream
  * renderer to manage, no GLSurfaceView, no preserveEGLContextOnPause hack. Rotation and re-parent
  * just destroy/recreate the underlying Android Surface; the native context keeps its GL state.
  *
- * On launch we extract `assets/undertale/` into `filesDir/butterscotch/undertale/` if it isn't
- * there yet, point the runner at it, and start the render thread once.
+ * Launched with [EXTRA_GAME_ID]; the WAD path and saves directory are resolved through
+ * [net.perfectdreams.butterscotch.android.library.GameLibrary] from that id. Finishes immediately if the id is missing or unknown (e.g. the
+ * library entry was removed between the launcher's snapshot and the click).
  */
 class GameActivity : ComponentActivity() {
     var butterscotchRunner: ButterscotchDroidRunner? = null
@@ -59,32 +58,32 @@ class GameActivity : ComponentActivity() {
             window.attributes.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
         }
 
-        val gameDir = File(filesDir, GAME_DIR_NAME).apply { mkdirs() }
-        val bundleDir = File(gameDir, GAME_ASSET_DIR).apply { mkdirs() }
-        val dataWin = File(bundleDir, "data.win")
-        val savesDir = File(gameDir, "saves").apply { mkdirs() }
-
-        if (!dataWin.exists()) {
-            try {
-                extractAssetTree(GAME_ASSET_DIR, bundleDir)
-                Log.i(TAG, "Extracted $GAME_ASSET_DIR/ to $bundleDir")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to extract $GAME_ASSET_DIR from assets", e)
-                finish()
-                return
-            }
-            if (!dataWin.exists()) {
-                Log.e(TAG, "Expected data.win at $dataWin after extraction; assets are probably empty")
-                finish()
-                return
-            }
+        val gameId = intent.getStringExtra(EXTRA_GAME_ID)
+        if (gameId == null) {
+            Log.e(TAG, "GameActivity launched without $EXTRA_GAME_ID extra")
+            finish()
+            return
+        }
+        val library = GameLibrary.load(this)
+        val entry = library.findById(gameId)
+        if (entry == null) {
+            Log.e(TAG, "No library entry for gameId=$gameId")
+            finish()
+            return
+        }
+        val wadFile = library.wadPath(entry)
+        val savesDir = library.savesDir(entry).apply { mkdirs() }
+        if (!wadFile.exists()) {
+            Log.e(TAG, "WAD file missing at $wadFile (library entry is stale)")
+            finish()
+            return
         }
 
         // Reset the exit latch — hasExited is process-singleton state, so a previous session's
         // exit would otherwise immediately finish() us via the LaunchedEffect below.
         ButterscotchNative.resetExitLatch()
 
-        val butterscotchRunner = ButterscotchDroidRunner(dataWin.absolutePath, savesDir.absolutePath)
+        val butterscotchRunner = ButterscotchDroidRunner(wadFile.absolutePath, savesDir.absolutePath)
         this.butterscotchRunner = butterscotchRunner
 
         setContent {
@@ -190,33 +189,8 @@ class GameActivity : ComponentActivity() {
         super.onDestroy()
     }
 
-    private fun extractAssetTree(assetPath: String, destDir: File) {
-        val children = assets.list(assetPath) ?: emptyArray()
-        if (children.isEmpty()) {
-            destDir.parentFile?.mkdirs()
-            assets.open(assetPath, AssetManager.ACCESS_STREAMING).use { input ->
-                FileOutputStream(destDir).use { output -> input.copyTo(output) }
-            }
-            return
-        }
-        destDir.mkdirs()
-        for (child in children) {
-            val childAssetPath = "$assetPath/$child"
-            val childDest = File(destDir, child)
-            val grandChildren = assets.list(childAssetPath) ?: emptyArray()
-            if (grandChildren.isEmpty()) {
-                assets.open(childAssetPath, AssetManager.ACCESS_STREAMING).use { input ->
-                    FileOutputStream(childDest).use { output -> input.copyTo(output) }
-                }
-            } else {
-                extractAssetTree(childAssetPath, childDest)
-            }
-        }
-    }
-
     companion object {
         private const val TAG = "GameActivity"
-        private const val GAME_DIR_NAME = "butterscotch"
-        private const val GAME_ASSET_DIR = "undertale"
+        const val EXTRA_GAME_ID = "net.perfectdreams.butterscotch.android.EXTRA_GAME_ID"
     }
 }
