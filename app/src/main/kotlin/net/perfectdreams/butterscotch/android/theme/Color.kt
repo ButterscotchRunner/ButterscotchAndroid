@@ -4,6 +4,8 @@ import androidx.compose.ui.graphics.Color
 
 val ButterscotchPrimary = Color(0xFFE8A552)
 val ButterscotchOnPrimary = Color(0xFF3A2A10)
+val ButterscotchPrimaryContainer = Color(0xFF4FB3B3)
+val ButterscotchOnPrimaryContainer = Color(0xFF06322F)
 
 val ButterscotchSecondary = Color(0xFFD9C2A0)
 val ButterscotchOnSecondary = Color(0xFF3A2A10)

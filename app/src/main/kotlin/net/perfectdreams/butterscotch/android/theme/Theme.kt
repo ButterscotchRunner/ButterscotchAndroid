@@ -15,6 +15,8 @@ private val DarkColorScheme = darkColorScheme(
     onBackground = ButterscotchOnBackground,
     surface = ButterscotchSurface,
     onSurface = ButterscotchOnSurface,
+    primaryContainer = ButterscotchPrimaryContainer,
+    onPrimaryContainer = ButterscotchOnPrimaryContainer,
 )
 
 @Composable
