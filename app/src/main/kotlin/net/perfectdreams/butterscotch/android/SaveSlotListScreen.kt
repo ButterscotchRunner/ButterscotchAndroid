@@ -54,7 +54,7 @@ import java.util.UUID
 @Composable
 fun SaveSlotListScreen(
     library: GameLibrary,
-    gameId: String,
+    gameId: UUID,
     nav: NavHostController,
 ) {
     val entry = library.findById(gameId) ?: return

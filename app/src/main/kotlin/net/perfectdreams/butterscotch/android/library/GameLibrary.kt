@@ -67,7 +67,6 @@ class GameLibrary private constructor(
     fun iconFile(entry: GameEntry): File = iconFile(entry.id)
 
     fun findById(id: UUID): GameEntry? = entries.firstOrNull { it.id == id }
-    fun findById(id: String): GameEntry? = findById(UUID.fromString(id))
 
     /**
      * Allocate a fresh per-game directory for the importer to stage files into. The directory is

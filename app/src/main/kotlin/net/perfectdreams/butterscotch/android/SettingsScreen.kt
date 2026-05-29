@@ -36,6 +36,7 @@ import net.perfectdreams.butterscotch.android.components.ButterscotchBackButton
 import net.perfectdreams.butterscotch.android.components.ButterscotchTopBar
 import net.perfectdreams.butterscotch.android.library.GameLibrary
 import net.perfectdreams.butterscotch.android.shortcuts.requestPinGameShortcut
+import java.util.UUID
 
 /**
  * Per-game settings screen. Lives under [Route.GameSettings] in the nav graph. Rows route to
@@ -49,7 +50,7 @@ import net.perfectdreams.butterscotch.android.shortcuts.requestPinGameShortcut
 @Composable
 fun SettingsScreen(
     library: GameLibrary,
-    gameId: String,
+    gameId: UUID,
     nav: NavHostController
 ) {
     // Sadly we need to do this hacky hack because when deleting this gets recomposed and gets a null entry

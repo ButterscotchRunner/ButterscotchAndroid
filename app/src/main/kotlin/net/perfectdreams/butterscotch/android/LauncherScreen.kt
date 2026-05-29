@@ -138,7 +138,7 @@ fun LauncherScreen(
                             })
                         },
                         onOpenSettings = {
-                            nav.navigate(Route.GameSettings(entry.id.toString()))
+                            nav.navigate(Route.GameSettings(entry.id))
                         },
                     )
                 }

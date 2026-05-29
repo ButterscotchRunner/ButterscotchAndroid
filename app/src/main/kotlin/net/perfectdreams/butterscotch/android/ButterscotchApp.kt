@@ -1,11 +1,8 @@
 package net.perfectdreams.butterscotch.android
 
-import android.content.Intent
 import androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -17,9 +14,7 @@ import net.perfectdreams.butterscotch.android.library.GameLibrary
  * The entry point of the app!
  */
 @Composable
-fun ButterscotchApp() {
-    val library = Libraries.getGameLibrary()
-    val layouts = Libraries.getLayoutLibrary()
+fun ButterscotchApp(gameLibrary: GameLibrary, layoutLibrary: LayoutLibrary) {
     val nav = rememberNavController()
 
     NavHost(
@@ -32,10 +27,10 @@ fun ButterscotchApp() {
         popExitTransition = { slideOutOfContainer(SlideDirection.End, tween(250)) },
     ) {
         composable<Route.Launcher> {
-            LauncherScreen(library = library, nav = nav)
+            LauncherScreen(library = gameLibrary, nav = nav)
         }
         composable<Route.ImportGame> {
-            ImportScreen(library = library, nav)
+            ImportScreen(library = gameLibrary, nav)
         }
         composable<Route.About> {
             AboutScreen(nav = nav)
@@ -43,7 +38,7 @@ fun ButterscotchApp() {
         composable<Route.GameSettings> { backStackEntry ->
             val args = backStackEntry.toRoute<Route.GameSettings>()
             SettingsScreen(
-                library = library,
+                library = gameLibrary,
                 gameId = args.gameId,
                 nav = nav
             )
@@ -51,7 +46,8 @@ fun ButterscotchApp() {
         composable<Route.GameMetadata> { backStackEntry ->
             val args = backStackEntry.toRoute<Route.GameMetadata>()
             GameMetadataScreen(
-                library = library,
+                gameLibrary = gameLibrary,
+                layoutLibrary = layoutLibrary,
                 gameId = args.gameId,
                 nav = nav,
             )
@@ -59,7 +55,7 @@ fun ButterscotchApp() {
         composable<Route.SaveSlotList> { backStackEntry ->
             val args = backStackEntry.toRoute<Route.SaveSlotList>()
             SaveSlotListScreen(
-                library = library,
+                library = gameLibrary,
                 gameId = args.gameId,
                 nav = nav,
             )
@@ -67,7 +63,7 @@ fun ButterscotchApp() {
         composable<Route.SaveSlotDetail> { backStackEntry ->
             val args = backStackEntry.toRoute<Route.SaveSlotDetail>()
             SaveSlotDetailScreen(
-                library = library,
+                library = gameLibrary,
                 gameId = args.gameId,
                 slotId = args.slotId,
                 nav = nav,

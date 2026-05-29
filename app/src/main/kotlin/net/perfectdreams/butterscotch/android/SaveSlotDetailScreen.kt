@@ -68,7 +68,7 @@ import java.util.UUID
 @Composable
 fun SaveSlotDetailScreen(
     library: GameLibrary,
-    gameId: String,
+    gameId: UUID,
     slotId: String,
     nav: NavHostController,
 ) {

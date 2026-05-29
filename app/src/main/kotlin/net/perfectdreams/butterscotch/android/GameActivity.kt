@@ -52,8 +52,8 @@ class GameActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        Libraries.loadGameLibrary(this.applicationContext)
-        Libraries.loadLayoutLibrary(this.applicationContext)
+        val gameLibrary = Libraries.loadGameLibrary(this.applicationContext)
+        val layoutLibrary = Libraries.loadLayoutLibrary(this.applicationContext)
 
         // Keep the screen on while the game runs - matches the GLFW build's default behavior.
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -67,21 +67,22 @@ class GameActivity : ComponentActivity() {
             window.attributes.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
         }
 
-        val gameId = intent.getStringExtra(EXTRA_GAME_ID)
-        if (gameId == null) {
+        val gameIdAsString = intent.getStringExtra(EXTRA_GAME_ID)
+        if (gameIdAsString == null) {
             Log.e(TAG, "GameActivity launched without $EXTRA_GAME_ID extra")
             finish()
             return
         }
-        val library = Libraries.getGameLibrary()
-        val entry = library.findById(gameId)
+
+        val gameId = UUID.fromString(gameIdAsString)
+        val entry = gameLibrary.findById(gameId)
         if (entry == null) {
             Log.e(TAG, "No library entry for gameId=$gameId")
             finish()
             return
         }
-        val wadFile = library.wadPath(entry)
-        val savesDir = library.savesDir(entry).apply { mkdirs() }
+        val wadFile = gameLibrary.wadPath(entry)
+        val savesDir = gameLibrary.savesDir(entry).apply { mkdirs() }
         if (!wadFile.exists()) {
             Log.e(TAG, "WAD file missing at $wadFile (library entry is stale)")
             finish()
@@ -160,10 +161,9 @@ class GameActivity : ComponentActivity() {
                         keys.releaseAll()
                     }
 
-                    val layoutLib = Libraries.getLayoutLibrary()
                     val isPortrait = constraints.maxHeight >= constraints.maxWidth
 
-                    val liveEntry = requireNotNull(library.findById(gameId))
+                    val liveEntry = requireNotNull(gameLibrary.findById(gameId))
 
                     // Resolve this game's assigned layout for the current orientation, falling back to the built-in default if the id is missing.
                     // Keyed on (isPortrait, assignedId) so it  re-resolves on rotation AND when the assignment changes (after Save As).
@@ -173,16 +173,16 @@ class GameActivity : ComponentActivity() {
 
                     Log.i(TAG, "Using $assignedId for the gamepad layout... The fallback ID is $fallbackId")
 
-                    var layout by remember(isPortrait, assignedId) { mutableStateOf(layoutLib.findById(assignedId) ?: layoutLib.findById(fallbackId)!!) }
+                    var layout by remember(isPortrait, assignedId) { mutableStateOf(layoutLibrary.findById(assignedId) ?: layoutLibrary.findById(fallbackId)!!) }
                     // Save only applies to user layouts; the built-in defaults are read-only.
                     val canSave = layout.id != LayoutLibrary.DEFAULT_PORTRAIT_LAYOUT && layout.id != LayoutLibrary.DEFAULT_LANDSCAPE_LAYOUT
-                    val onSave = { layoutLib.upsert(layout) }
+                    val onSave = { layoutLibrary.upsert(layout) }
                     val onSaveAs = { name: String ->
                         // Fork to a fresh id with the given name, persist it, and point this game's
                         // orientation-specific layout at the copy so it loads next time. Keep editing it.
                         val forked = layout.copy(id = UUID.randomUUID(), fancyName = name)
-                        layoutLib.upsert(forked)
-                        library.update(entry.id) { e ->
+                        layoutLibrary.upsert(forked)
+                        gameLibrary.update(entry.id) { e ->
                             if (isPortrait) e.copy(portraitLayout = forked.id) else e.copy(landscapeLayout = forked.id)
                         }
                         layout = forked

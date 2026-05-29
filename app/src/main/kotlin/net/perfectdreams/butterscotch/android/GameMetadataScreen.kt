@@ -27,6 +27,7 @@ import net.perfectdreams.butterscotch.android.components.ButterscotchBackButton
 import net.perfectdreams.butterscotch.android.components.ButterscotchTopBar
 import net.perfectdreams.butterscotch.android.components.MetadataForm
 import net.perfectdreams.butterscotch.android.layouts.GamepadLayout
+import net.perfectdreams.butterscotch.android.layouts.LayoutLibrary
 import net.perfectdreams.butterscotch.android.library.GameLibrary
 import net.perfectdreams.butterscotch.android.pe.scanIconCandidates
 import java.util.UUID
@@ -34,17 +35,17 @@ import java.util.UUID
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun GameMetadataScreen(
-    library: GameLibrary,
-    gameId: String,
+    gameLibrary: GameLibrary,
+    layoutLibrary: LayoutLibrary,
+    gameId: UUID,
     nav: NavHostController,
 ) {
-    val entry = library.findById(gameId) ?: return
-    val layouts = Libraries.getLayoutLibrary()
+    val entry = gameLibrary.findById(gameId) ?: return
 
     var title by rememberSaveable { mutableStateOf(entry.title) }
 
     val originalIcon = remember {
-        val f = library.iconFile(entry)
+        val f = gameLibrary.iconFile(entry)
         if (f.exists())
             BitmapFactory.decodeFile(f.absolutePath)
         else
@@ -78,24 +79,24 @@ fun GameMetadataScreen(
                     LayoutDropdown(
                         label = "Portrait Layout",
                         selectedId = portraitLayout,
-                        options = layouts.entries.filter { it.orientation == GamepadLayout.GamepadTargetOrientation.PORTRAIT },
+                        options = layoutLibrary.entries.filter { it.orientation == GamepadLayout.GamepadTargetOrientation.PORTRAIT },
                         onSelect = { id -> portraitLayout = id },
                     )
                     Spacer(Modifier.height(16.dp))
                     LayoutDropdown(
                         label = "Landscape Layout",
                         selectedId = landscapeLayout,
-                        options = layouts.entries.filter { it.orientation == GamepadLayout.GamepadTargetOrientation.LANDSCAPE },
+                        options = layoutLibrary.entries.filter { it.orientation == GamepadLayout.GamepadTargetOrientation.LANDSCAPE },
                         onSelect = { id -> landscapeLayout = id },
                     )
                     Spacer(Modifier.height(16.dp))
                 },
-                loadCandidates = { scanIconCandidates(library.bundleDir(entry)) },
+                loadCandidates = { scanIconCandidates(gameLibrary.bundleDir(entry)) },
                 saveEnabled = titleChanged || iconChanged || layoutsChanged,
                 onSave = {
-                    if (titleChanged) library.setTitle(entry.id, titleTrimmed)
-                    if (iconChanged) library.setIcon(entry.id, selectedIcon)
-                    if (layoutsChanged) library.update(entry.id) { it.copy(portraitLayout = portraitLayout, landscapeLayout = landscapeLayout) }
+                    if (titleChanged) gameLibrary.setTitle(entry.id, titleTrimmed)
+                    if (iconChanged) gameLibrary.setIcon(entry.id, selectedIcon)
+                    if (layoutsChanged) gameLibrary.update(entry.id) { it.copy(portraitLayout = portraitLayout, landscapeLayout = landscapeLayout) }
                     nav.popBackStack()
                 },
             )
