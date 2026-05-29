@@ -47,6 +47,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -60,6 +61,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
@@ -379,76 +381,17 @@ private fun MenuItem(label: String, onClick: () -> Unit) {
  * Visually, the thumb glyph follows the finger (clamped to the base radius) for tactile feedback.
  */
 @Composable
-private fun Joystick(
-    up: InputBinding,
-    down: InputBinding,
-    left: InputBinding,
-    right: InputBinding,
-    keys: VirtualKeyState,
-    modifier: Modifier = Modifier
+private fun JoystickBase(
+    modifier: Modifier = Modifier,
+    modifierWithOffset: Modifier.(thumbOffset: MutableState<Offset>) -> Modifier
 ) {
-    var thumbOffset by remember { mutableStateOf(Offset.Zero) }
+    val thumbOffset = remember { mutableStateOf(Offset.Zero) }
 
     Box(
         modifier = modifier
             .clip(CircleShape)
             .background(Color.White.copy(alpha = 0.18f))
-            .pointerInput(up, down, left, right) {
-                awaitEachGesture {
-                    val downPointer = awaitFirstDown(requireUnconsumed = false)
-                    downPointer.consume()
-                    val center = Offset(size.width / 2f, size.height / 2f)
-                    val radiusPx = min(size.width, size.height) / 2f
-                    val deadzonePx = radiusPx * 0.30f
-
-                    var currentKeys = emptySet<InputBinding>()
-
-                    fun update(position: Offset) {
-                        val delta = position - center
-                        val dist = sqrt(delta.x * delta.x + delta.y * delta.y)
-                        // Visual thumb position: clamp to base radius so it stays inside the circle.
-                        thumbOffset = if (dist > radiusPx) delta * (radiusPx / dist) else delta
-
-                        val newKeys = if (dist < deadzonePx) {
-                            emptySet()
-                        } else {
-                            // Asymmetric 8-way sectors: cardinals are 60 degrees wide, diagonals are
-                            // only 30 degrees wide. The WebKT reference uses equal 45/45 sectors,
-                            // which makes "pure down" so narrow (only +-22.5 degrees from straight
-                            // down) that natural thumb-pivot offset usually lands you in a diagonal.
-                            // That breaks menus like Undertale's name entry, which dispatch each
-                            // arrow as a discrete keyboard_check_pressed event - diagonal combos
-                            // get mis-handled. Widening cardinals to 60 degrees gives much more
-                            // forgiving "I'm pushing this way" detection while still leaving room
-                            // for intentional diagonals (needed in DELTARUNE bullet boards, etc.).
-                            //
-                            // Angle is normalized to [0, 360) where 0=right, 90=down, 180=left, 270=up.
-                            val angleDeg = (Math.toDegrees(atan2(delta.y, delta.x).toDouble()) + 360.0) % 360.0
-                            val cardinalHalfWidth = 30.0  // cardinal zone = +-30 around its axis
-                            bindingsForAngle(angleDeg, cardinalHalfWidth, up, down, left, right)
-                        }
-                        keys.transition(currentKeys, newKeys)
-                        currentKeys = newKeys
-                    }
-
-                    update(downPointer.position)
-                    while (true) {
-                        val event = awaitPointerEvent(PointerEventPass.Main)
-                        val change = event.changes.firstOrNull { it.id == downPointer.id } ?: break
-                        if (!change.pressed) {
-                            change.consume()
-                            break
-                        }
-                        if (change.positionChanged()) {
-                            change.consume()
-                            update(change.position)
-                        }
-                    }
-                    // Pointer released or cancelled - drop all keys this joystick was holding.
-                    keys.transition(currentKeys, emptySet())
-                    thumbOffset = Offset.Zero
-                }
-            }
+            .modifierWithOffset(thumbOffset)
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val radius = size.minDimension / 2f
@@ -464,8 +407,85 @@ private fun Joystick(
             drawCircle(
                 color = Color.White.copy(alpha = 0.6f),
                 radius = radius * 0.40f,
-                center = center + thumbOffset
+                center = center + thumbOffset.value
             )
+        }
+    }
+}
+
+/**
+ * 8-way directional joystick. Mirrors the WebKT reference: map the finger position relative to the
+ * joystick centre into an angle, snap that angle to one of 8 sectors (45 degrees each), and emit the
+ * corresponding GameMaker arrow-key combo. A circular deadzone in the middle suppresses jitter.
+ *
+ * Visually, the thumb glyph follows the finger (clamped to the base radius) for tactile feedback.
+ */
+@Composable
+private fun Joystick(
+    up: InputBinding,
+    down: InputBinding,
+    left: InputBinding,
+    right: InputBinding,
+    keys: VirtualKeyState,
+    modifier: Modifier = Modifier
+) {
+    JoystickBase(modifier) { thumbOffset ->
+        this.pointerInput(up, down, left, right) {
+            awaitEachGesture {
+                val downPointer = awaitFirstDown(requireUnconsumed = false)
+                downPointer.consume()
+                val center = Offset(size.width / 2f, size.height / 2f)
+                val radiusPx = min(size.width, size.height) / 2f
+                val deadzonePx = radiusPx * 0.30f
+
+                var currentKeys = emptySet<InputBinding>()
+
+                fun update(position: Offset) {
+                    val delta = position - center
+                    val dist = sqrt(delta.x * delta.x + delta.y * delta.y)
+                    // Visual thumb position: clamp to base radius so it stays inside the circle.
+                    thumbOffset.value = if (dist > radiusPx) delta * (radiusPx / dist) else delta
+
+                    val newKeys = if (dist < deadzonePx) {
+                        emptySet()
+                    } else {
+                        // Asymmetric 8-way sectors: cardinals are 60 degrees wide, diagonals are
+                        // only 30 degrees wide. The WebKT reference uses equal 45/45 sectors,
+                        // which makes "pure down" so narrow (only +-22.5 degrees from straight
+                        // down) that natural thumb-pivot offset usually lands you in a diagonal.
+                        // That breaks menus like Undertale's name entry, which dispatch each
+                        // arrow as a discrete keyboard_check_pressed event - diagonal combos
+                        // get mis-handled. Widening cardinals to 60 degrees gives much more
+                        // forgiving "I'm pushing this way" detection while still leaving room
+                        // for intentional diagonals (needed in DELTARUNE bullet boards, etc.).
+                        //
+                        // Angle is normalized to [0, 360) where 0=right, 90=down, 180=left, 270=up.
+                        val angleDeg =
+                            (Math.toDegrees(atan2(delta.y, delta.x).toDouble()) + 360.0) % 360.0
+                        val cardinalHalfWidth = 30.0  // cardinal zone = +-30 around its axis
+                        bindingsForAngle(angleDeg, cardinalHalfWidth, up, down, left, right)
+                    }
+                    keys.transition(currentKeys, newKeys)
+                    currentKeys = newKeys
+                }
+
+                update(downPointer.position)
+                while (true) {
+                    val event = awaitPointerEvent(PointerEventPass.Main)
+                    val change = event.changes.firstOrNull { it.id == downPointer.id } ?: break
+                    if (!change.pressed) {
+                        change.consume()
+                        break
+                    }
+                    if (change.positionChanged()) {
+                        change.consume()
+                        update(change.position)
+                    }
+                }
+                // Pointer released or cancelled - drop all keys this joystick was holding.
+                keys.transition(currentKeys, emptySet())
+                thumbOffset.value = Offset.Zero
+            }
         }
     }
 }
@@ -489,67 +509,44 @@ private fun AnalogJoystick(
     keys: VirtualKeyState,
     modifier: Modifier = Modifier
 ) {
-    var thumbOffset by remember { mutableStateOf(Offset.Zero) }
+    JoystickBase(modifier) { thumbOffset ->
+        this.pointerInput(stick) {
+            awaitEachGesture {
+                val downPointer = awaitFirstDown(requireUnconsumed = false)
+                downPointer.consume()
+                val center = Offset(size.width / 2f, size.height / 2f)
+                val radiusPx = min(size.width, size.height) / 2f
 
-    Box(
-        modifier = modifier
-            .clip(CircleShape)
-            .background(Color.White.copy(alpha = 0.18f))
-            .pointerInput(stick, device) {
-                awaitEachGesture {
-                    val downPointer = awaitFirstDown(requireUnconsumed = false)
-                    downPointer.consume()
-                    val center = Offset(size.width / 2f, size.height / 2f)
-                    val radiusPx = min(size.width, size.height) / 2f
-
-                    fun update(position: Offset) {
-                        val delta = position - center
-                        val dist = sqrt(delta.x * delta.x + delta.y * delta.y)
-                        // Clamp to the base radius so the normalized value never exceeds 1.0.
-                        val clamped = if (dist > radiusPx) delta * (radiusPx / dist) else delta
-                        thumbOffset = clamped
-                        val x = if (radiusPx > 0f) (clamped.x / radiusPx).coerceIn(-1f, 1f) else 0f
-                        val y = if (radiusPx > 0f) (clamped.y / radiusPx).coerceIn(-1f, 1f) else 0f
-                        keys.setAxis(device, stick.horizontalAxisIndex, x)
-                        keys.setAxis(device, stick.verticalAxisIndex, y)
-                    }
-
-                    update(downPointer.position)
-                    while (true) {
-                        val event = awaitPointerEvent(PointerEventPass.Main)
-                        val change = event.changes.firstOrNull { it.id == downPointer.id } ?: break
-                        if (!change.pressed) {
-                            change.consume()
-                            break
-                        }
-                        if (change.positionChanged()) {
-                            change.consume()
-                            update(change.position)
-                        }
-                    }
-                    // Pointer released or cancelled - re-center the stick.
-                    keys.setAxis(device, stick.horizontalAxisIndex, 0f)
-                    keys.setAxis(device, stick.verticalAxisIndex, 0f)
-                    thumbOffset = Offset.Zero
+                fun update(position: Offset) {
+                    val delta = position - center
+                    val dist = sqrt(delta.x * delta.x + delta.y * delta.y)
+                    // Clamp to the base radius so the normalized value never exceeds 1.0.
+                    val clamped = if (dist > radiusPx) delta * (radiusPx / dist) else delta
+                    thumbOffset.value = clamped
+                    val x = if (radiusPx > 0f) (clamped.x / radiusPx).coerceIn(-1f, 1f) else 0f
+                    val y = if (radiusPx > 0f) (clamped.y / radiusPx).coerceIn(-1f, 1f) else 0f
+                    keys.setAxis(device, stick.horizontalAxisIndex, x)
+                    keys.setAxis(device, stick.verticalAxisIndex, y)
                 }
+
+                update(downPointer.position)
+                while (true) {
+                    val event = awaitPointerEvent(PointerEventPass.Main)
+                    val change = event.changes.firstOrNull { it.id == downPointer.id } ?: break
+                    if (!change.pressed) {
+                        change.consume()
+                        break
+                    }
+                    if (change.positionChanged()) {
+                        change.consume()
+                        update(change.position)
+                    }
+                }
+                // Pointer released or cancelled - re-center the stick.
+                keys.setAxis(device, stick.horizontalAxisIndex, 0f)
+                keys.setAxis(device, stick.verticalAxisIndex, 0f)
+                thumbOffset.value = Offset.Zero
             }
-    ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val radius = size.minDimension / 2f
-            val center = Offset(size.width / 2f, size.height / 2f)
-            // Outer ring
-            drawCircle(
-                color = Color.White.copy(alpha = 0.35f),
-                radius = radius * 0.95f,
-                center = center,
-                style = Stroke(width = 4f)
-            )
-            // Thumb
-            drawCircle(
-                color = Color.White.copy(alpha = 0.6f),
-                radius = radius * 0.40f,
-                center = center + thumbOffset
-            )
         }
     }
 }
