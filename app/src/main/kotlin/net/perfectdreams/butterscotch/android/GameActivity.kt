@@ -30,7 +30,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.viewinterop.AndroidView
 import net.perfectdreams.butterscotch.android.components.GameControls
 import net.perfectdreams.butterscotch.android.components.MenuOverlay
-import net.perfectdreams.butterscotch.android.components.VirtualKeyState
 import net.perfectdreams.butterscotch.android.layouts.LayoutLibrary
 import java.util.UUID
 
