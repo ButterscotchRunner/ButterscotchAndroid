@@ -8,9 +8,14 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -25,14 +30,26 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +70,8 @@ import kotlin.math.sqrt
 import java.util.UUID
 import net.perfectdreams.butterscotch.android.layouts.GamepadElement
 import net.perfectdreams.butterscotch.android.layouts.GamepadLayout
+import net.perfectdreams.butterscotch.android.layouts.GamepadStick
+import net.perfectdreams.butterscotch.android.layouts.GmlKey
 import net.perfectdreams.butterscotch.android.layouts.InputBinding
 import net.perfectdreams.butterscotch.android.layouts.KeyTrigger
 
@@ -131,12 +150,20 @@ class VirtualKeyState(val runner: ButterscotchDroidRunner) {
  * The caller owns the [VirtualKeyState] so it can release all held keys on lifecycle events (e.g.
  * the menu opening, or an orientation change recomposing the layout).
  *
- * We do not load or edit layouts yet, so this renders the built-in [defaultGamepadLayout], which
- * reproduces the old hardcoded joystick + C/X/Z gamepad expressed through the layout model.
+ * [layout] is owned by the caller (GameActivity) so edits survive an Overlay/Stacked reflow. When
+ * [editMode] is on, controls become draggable and long-pressable instead of playable, and edits are
+ * pushed back through [onLayoutChange]. We do not persist layouts yet - this is purely in-memory.
  */
 @Composable
-fun GameControls(keys: VirtualKeyState, modifier: Modifier = Modifier) {
-    GamepadLayoutView(defaultGamepadLayout, keys, modifier)
+fun GameControls(
+    layout: GamepadLayout,
+    editMode: Boolean,
+    onLayoutChange: (GamepadLayout) -> Unit,
+    onExitEditMode: () -> Unit,
+    keys: VirtualKeyState,
+    modifier: Modifier = Modifier
+) {
+    GamepadLayoutView(layout, editMode, onLayoutChange, onExitEditMode, keys, modifier)
 }
 
 // Renders a GamepadLayout into the given area. Element geometry follows the model contract:
@@ -144,48 +171,336 @@ fun GameControls(keys: VirtualKeyState, modifier: Modifier = Modifier) {
 // center, and scale is a fraction of min(width, height) applied to both dimensions (so circular
 // controls stay circular on any overlay aspect). opacity is purely visual - alpha() does not gate
 // pointer input, so an opacity-0 element is still tappable (useful later for skin hit zones).
+//
+// In edit mode the playable gestures are swapped for drag-to-move + long-press-to-edit, opacity is
+// ignored (so invisible elements stay visible/draggable), and a "Done" button plus the per-element
+// editor dialog are shown.
 @Composable
-private fun GamepadLayoutView(layout: GamepadLayout, keys: VirtualKeyState, modifier: Modifier = Modifier) {
+private fun GamepadLayoutView(
+    layout: GamepadLayout,
+    editMode: Boolean,
+    onLayoutChange: (GamepadLayout) -> Unit,
+    onExitEditMode: () -> Unit,
+    keys: VirtualKeyState,
+    modifier: Modifier = Modifier
+) {
+    // Index of the element whose editor dialog is open, or null. Leaving edit mode closes it.
+    var editingIndex by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(editMode) { if (!editMode) editingIndex = null }
+
+    // A pointerInput block captures its surroundings once (it is not re-keyed on every layout edit),
+    // so reads inside the drag handler must go through these always-latest snapshots rather than the
+    // captured-at-launch parameters, or mid-drag reads would be stale.
+    val currentLayout by rememberUpdatedState(layout)
+    val currentOnChange by rememberUpdatedState(onLayoutChange)
+
     BoxWithConstraints(modifier) {
         val ref = if (maxWidth < maxHeight) maxWidth else maxHeight
-        layout.element.forEach { element ->
+        // Container size in pixels, used to convert drag deltas (px) into 0..1 position fractions.
+        val widthPx = constraints.maxWidth.toFloat()
+        val heightPx = constraints.maxHeight.toFloat()
+
+        fun updateAt(index: Int, element: GamepadElement) {
+            val l = currentLayout
+            currentOnChange(l.copy(element = l.element.toMutableList().also { it[index] = element }))
+        }
+        fun deleteAt(index: Int) {
+            val l = currentLayout
+            currentOnChange(l.copy(element = l.element.filterIndexed { i, _ -> i != index }))
+            editingIndex = null
+        }
+        // Append a new button at the overlay center and open its editor so its key can be set.
+        fun addKey() {
+            val l = currentLayout
+            val new = GamepadElement.Key(
+                positionX = 0.5, positionY = 0.5, scale = 0.22, opacity = 1.0,
+                label = null, type = KeyTrigger.Press, binding = InputBinding.Keyboard(GmlKey.Z.code)
+            )
+            currentOnChange(l.copy(element = l.element + new))
+            editingIndex = l.element.size // index of the appended element in the new list
+        }
+        // Append a new 8-way joystick at the overlay center, bound to the arrow keys, and edit it.
+        fun addJoystick() {
+            val l = currentLayout
+            val new = GamepadElement.Joystick(
+                positionX = 0.5, positionY = 0.5, scale = 0.42, opacity = 1.0,
+                up = InputBinding.Keyboard(GmlKey.UP.code),
+                down = InputBinding.Keyboard(GmlKey.DOWN.code),
+                left = InputBinding.Keyboard(GmlKey.LEFT.code),
+                right = InputBinding.Keyboard(GmlKey.RIGHT.code),
+            )
+            currentOnChange(l.copy(element = l.element + new))
+            editingIndex = l.element.size
+        }
+
+        layout.element.forEachIndexed { index, element ->
             val sizeDp = ref * element.scale.toFloat()
             val centerX = maxWidth * element.positionX.toFloat()
             val centerY = maxHeight * element.positionY.toFloat()
-            val placement = Modifier
+            val base = Modifier
                 .offset(x = centerX - sizeDp / 2f, y = centerY - sizeDp / 2f)
                 .size(sizeDp)
-                .alpha(element.opacity.toFloat())
 
-            when (element) {
-                is GamepadElement.Joystick -> Joystick(
-                    up = element.up,
-                    down = element.down,
-                    left = element.left,
-                    right = element.right,
-                    keys = keys,
-                    modifier = placement
+            if (editMode) {
+                // Two gesture detectors on the same element: drag moves it (immediately), a long
+                // press with no movement opens its editor. Movement past touch slop cancels the
+                // long press, so the two do not fight.
+                val editModifier = base
+                    .pointerInput(index, widthPx, heightPx) {
+                        // Accumulate position locally (synchronous, immune to recomposition timing)
+                        // seeded from the latest committed position at drag start, pushing each step
+                        // to the model.
+                        var px = 0.0
+                        var py = 0.0
+                        detectDragGestures(
+                            onDragStart = {
+                                currentLayout.element.getOrNull(index)?.let { px = it.positionX; py = it.positionY }
+                            },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                val el = currentLayout.element.getOrNull(index)
+                                if (el != null) {
+                                    px = (px + dragAmount.x / widthPx).coerceIn(0.0, 1.0)
+                                    py = (py + dragAmount.y / heightPx).coerceIn(0.0, 1.0)
+                                    updateAt(index, el.movedTo(px, py))
+                                }
+                            }
+                        )
+                    }
+                    .pointerInput(index) {
+                        detectTapGestures(onLongPress = { editingIndex = index })
+                    }
+                EditableElement(
+                    label = editLabelFor(element),
+                    selected = editingIndex == index,
+                    modifier = editModifier
                 )
-                is GamepadElement.Key -> ActionButton(
-                    label = element.label ?: defaultLabelFor(element.binding),
-                    binding = element.binding,
-                    type = element.type,
-                    keys = keys,
-                    modifier = placement
+            } else {
+                val placement = base.alpha(element.opacity.toFloat())
+                when (element) {
+                    is GamepadElement.Joystick -> Joystick(
+                        up = element.up,
+                        down = element.down,
+                        left = element.left,
+                        right = element.right,
+                        keys = keys,
+                        modifier = placement
+                    )
+                    is GamepadElement.Key -> ActionButton(
+                        label = element.label ?: defaultLabelFor(element.binding),
+                        binding = element.binding,
+                        type = element.type,
+                        keys = keys,
+                        modifier = placement
+                    )
+                    // Analog sticks need a continuous gamepad-axis transport that does not exist yet,
+                    // so they are not rendered. The default layout contains none.
+                    is GamepadElement.AnalogJoystick -> {}
+                }
+            }
+        }
+
+        if (editMode) {
+            Column(
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Edit mode - drag to move, long-press to edit",
+                    color = Color.White,
+                    style = TextStyle(fontSize = 13.sp)
                 )
-                // Analog sticks need a continuous gamepad-axis transport that does not exist yet, so
-                // they are not rendered. The default layout contains none.
-                is GamepadElement.AnalogJoystick -> {}
+                Spacer(Modifier.height(8.dp))
+                Box {
+                    var addMenuExpanded by remember { mutableStateOf(false) }
+                    Button(onClick = { addMenuExpanded = true }) { Text("Add") }
+                    DropdownMenu(expanded = addMenuExpanded, onDismissRequest = { addMenuExpanded = false }) {
+                        DropdownMenuItem(text = { Text("Button") }, onClick = {
+                            addMenuExpanded = false
+                            addKey()
+                        })
+                        DropdownMenuItem(text = { Text("Joystick") }, onClick = {
+                            addMenuExpanded = false
+                            addJoystick()
+                        })
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Button(onClick = onExitEditMode) { Text("Done") }
+            }
+
+            // key(idx) so the dialog's internal field state resets when a different element is picked.
+            val idx = editingIndex
+            if (idx != null && idx in layout.element.indices) {
+                key(idx) {
+                    ElementEditDialog(
+                        element = layout.element[idx],
+                        onChange = { updateAt(idx, it) },
+                        onDelete = { deleteAt(idx) },
+                        onDismiss = { editingIndex = null }
+                    )
+                }
             }
         }
     }
+}
+
+// A non-interactive stand-in drawn for each element while editing: a translucent circle with the
+// element's label and a selection ring. We do not reuse the playable composables here because their
+// pointer handlers would dispatch input; the edit gestures live on the wrapping modifier instead.
+@Composable
+private fun EditableElement(label: String, selected: Boolean, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .clip(CircleShape)
+            .background(Color.White.copy(alpha = 0.25f))
+            .border(
+                width = if (selected) 3.dp else 1.5.dp,
+                color = if (selected) Color(0xFF4FC3F7) else Color.White.copy(alpha = 0.7f),
+                shape = CircleShape
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, color = Color.White, style = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold))
+    }
+}
+
+// Editor dialog for one element: size, opacity, the bound key(s), and delete. Edits are applied live
+// through [onChange] so the change is visible behind the dialog.
+@Composable
+private fun ElementEditDialog(
+    element: GamepadElement,
+    onChange: (GamepadElement) -> Unit,
+    onDelete: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+        dismissButton = { TextButton(onClick = onDelete) { Text("Delete", color = Color(0xFFE53935)) } },
+        title = {
+            Text(
+                when (element) {
+                    is GamepadElement.Key -> "Edit button"
+                    is GamepadElement.Joystick -> "Edit joystick"
+                    is GamepadElement.AnalogJoystick -> "Edit analog stick"
+                }
+            )
+        },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text("Size: ${percent(element.scale)}")
+                Slider(
+                    value = element.scale.toFloat(),
+                    onValueChange = { onChange(element.withScale(it.toDouble())) },
+                    valueRange = 0.05f..1f
+                )
+                Text("Opacity: ${percent(element.opacity)}")
+                Slider(
+                    value = element.opacity.toFloat(),
+                    onValueChange = { onChange(element.withOpacity(it.toDouble())) },
+                    valueRange = 0f..1f
+                )
+                Spacer(Modifier.height(8.dp))
+                when (element) {
+                    is GamepadElement.Key -> VkField("Key", element.binding) { onChange(element.copy(binding = it)) }
+                    is GamepadElement.Joystick -> {
+                        VkField("Up", element.up) { onChange(element.copy(up = it)) }
+                        VkField("Down", element.down) { onChange(element.copy(down = it)) }
+                        VkField("Left", element.left) { onChange(element.copy(left = it)) }
+                        VkField("Right", element.right) { onChange(element.copy(right = it)) }
+                    }
+                    is GamepadElement.AnalogJoystick -> {
+                        TextButton(onClick = { onChange(element.copy(stick = GamepadStick.LEFT)) }) {
+                            Text("Left stick" + if (element.stick == GamepadStick.LEFT) " ✓" else "")
+                        }
+                        TextButton(onClick = { onChange(element.copy(stick = GamepadStick.RIGHT)) }) {
+                            Text("Right stick" + if (element.stick == GamepadStick.RIGHT) " ✓" else "")
+                        }
+                    }
+                }
+            }
+        }
+    )
+}
+
+// Key picker for the binding behind a control: a Material exposed dropdown (outlined field with a
+// floating label + trailing chevron) listing the keys the runner understands, so a user chooses by
+// name instead of typing a raw vk code. Selecting one always produces a keyboard binding. If the
+// current code is not in the list (e.g. a gamepad button) we show the raw code.
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun VkField(label: String, binding: InputBinding, onChange: (InputBinding) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    val current = GmlKey.fromCode(binding.code())
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+    ) {
+        OutlinedTextField(
+            value = current?.label ?: binding.code().toString(),
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(label) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                .fillMaxWidth()
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            GmlKey.values().forEach { gmlKey ->
+                DropdownMenuItem(
+                    text = { Text(gmlKey.label) },
+                    onClick = {
+                        onChange(InputBinding.Keyboard(gmlKey.code))
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+private fun percent(value: Double): String = "${(value * 100).toInt()}%"
+
+// Position/size/opacity copies. GamepadElement is sealed with no copy on the base, so each variant
+// has to be copied explicitly.
+private fun GamepadElement.movedTo(px: Double, py: Double): GamepadElement = when (this) {
+    is GamepadElement.Key -> copy(positionX = px, positionY = py)
+    is GamepadElement.Joystick -> copy(positionX = px, positionY = py)
+    is GamepadElement.AnalogJoystick -> copy(positionX = px, positionY = py)
+}
+private fun GamepadElement.withScale(s: Double): GamepadElement = when (this) {
+    is GamepadElement.Key -> copy(scale = s)
+    is GamepadElement.Joystick -> copy(scale = s)
+    is GamepadElement.AnalogJoystick -> copy(scale = s)
+}
+private fun GamepadElement.withOpacity(o: Double): GamepadElement = when (this) {
+    is GamepadElement.Key -> copy(opacity = o)
+    is GamepadElement.Joystick -> copy(opacity = o)
+    is GamepadElement.AnalogJoystick -> copy(opacity = o)
+}
+
+// Read the integer code behind a binding (keyboard vk or gamepad button number), used to find the
+// matching entry for the key dropdown.
+private fun InputBinding.code(): Int = when (this) {
+    is InputBinding.Keyboard -> vk
+    is InputBinding.GamepadButton -> button
+}
+
+// Label drawn on an element while editing.
+private fun editLabelFor(element: GamepadElement): String = when (element) {
+    is GamepadElement.Key -> element.label ?: defaultLabelFor(element.binding)
+    is GamepadElement.Joystick -> "✛"
+    is GamepadElement.AnalogJoystick -> "◉"
 }
 
 // Stable id for the built-in layout. We do not persist or load layouts yet; this is the hardcoded
 // equivalent of the old fixed gamepad. Positions approximate the original adaptive bottom-left
 // joystick + bottom-right C/X/Z cluster; a fixed layout cannot reproduce the old min/max size
 // clamps or the row-to-column reflow, which is an accepted trade for being data-driven.
-private val defaultGamepadLayout = GamepadLayout(
+internal val defaultGamepadLayout = GamepadLayout(
     id = UUID.fromString("00000000-0000-0000-0000-000000000001"),
     orientation = GamepadLayout.GamepadTargetOrientation.LANDSCAPE,
     element = listOf(
@@ -230,6 +545,7 @@ private fun defaultLabelFor(binding: InputBinding): String = when (binding) {
 fun MenuOverlay(
     onExitGame: () -> Unit,
     releaseAllKeys: () -> Unit,
+    onEditLayout: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var menuOpen by remember { mutableStateOf(false) }
@@ -257,7 +573,8 @@ fun MenuOverlay(
         MenuSidebar(
             open = menuOpen,
             onDismiss = { menuOpen = false },
-            onExitGame = onExitGame
+            onExitGame = onExitGame,
+            onEditLayout = onEditLayout
         )
     }
 }
@@ -301,10 +618,9 @@ private fun MenuButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
 private fun BoxScope.MenuSidebar(
     open: Boolean,
     onDismiss: () -> Unit,
-    onExitGame: () -> Unit
+    onExitGame: () -> Unit,
+    onEditLayout: () -> Unit
 ) {
-    var value by remember { mutableIntStateOf(0) }
-
     // Scrim - separate AnimatedVisibility so it can fade independently of the panel slide.
     // matchParentSize so the fade-in container covers the full screen while it's animating.
     AnimatedVisibility(
@@ -371,14 +687,15 @@ private fun BoxScope.MenuSidebar(
                     style = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold),
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
+                MenuItem(label = "Edit Layout", onClick = {
+                    onDismiss()
+                    onEditLayout()
+                })
+
                 MenuItem(label = "Exit", onClick = {
                     onDismiss()
                     onExitGame()
                 })
-
-                MenuItem(label = "Click Me! ($value)") {
-                    value++
-                }
             }
         }
     }

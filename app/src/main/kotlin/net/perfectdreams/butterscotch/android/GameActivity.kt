@@ -20,8 +20,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.movableContentOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.viewinterop.AndroidView
@@ -93,6 +96,14 @@ class GameActivity : ComponentActivity() {
             // into the runner with no Composable left to release them.
             val keys = remember { VirtualKeyState(butterscotchRunner) }
 
+            // The editable gamepad layout lives here (not inside GameControls) so edits survive an
+            // Overlay/Stacked reflow, which recomposes a different GameControls call site. In-memory
+            // only - we do not persist it yet.
+            var layout by remember { mutableStateOf(defaultGamepadLayout) }
+            var editMode by remember { mutableStateOf(false) }
+            // Toggling edit mode drops any held keys so a press in flight does not stick.
+            LaunchedEffect(editMode) { keys.releaseAll() }
+
             // Auto-finish when the native runner reports it has exited (game quit, fatal error).
             val hasExited = ButterscotchNative.hasExited
             LaunchedEffect(hasExited) {
@@ -148,7 +159,14 @@ class GameActivity : ComponentActivity() {
                         LayoutMode.Overlay -> {
                             Box(Modifier.fillMaxSize()) {
                                 gameSurface(Modifier.fillMaxSize())
-                                GameControls(keys = keys, modifier = Modifier.fillMaxSize())
+                                GameControls(
+                                    layout = layout,
+                                    editMode = editMode,
+                                    onLayoutChange = { layout = it },
+                                    onExitEditMode = { editMode = false },
+                                    keys = keys,
+                                    modifier = Modifier.fillMaxSize()
+                                )
                             }
                         }
                         LayoutMode.Stacked -> {
@@ -159,6 +177,10 @@ class GameActivity : ComponentActivity() {
                                         .aspectRatio(gameAspect)
                                 )
                                 GameControls(
+                                    layout = layout,
+                                    editMode = editMode,
+                                    onLayoutChange = { layout = it },
+                                    onExitEditMode = { editMode = false },
                                     keys = keys,
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -178,7 +200,8 @@ class GameActivity : ComponentActivity() {
                         // Doing the blocking join here directly would prevent recomposition.
                         butterscotchRunner.requestExit()
                     },
-                    releaseAllKeys = { keys.releaseAll() }
+                    releaseAllKeys = { keys.releaseAll() },
+                    onEditLayout = { editMode = true }
                 )
             }
         }
