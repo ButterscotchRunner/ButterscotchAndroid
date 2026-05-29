@@ -17,7 +17,7 @@ import kotlinx.coroutines.yield
 import java.util.concurrent.Executors
 
 // The Butterscotch Android API is actually "global bound", but we use a class to help managing things here (and will be useful if we refactor down the road)
-class ButterscotchDroidRunner(val dataWinPath: String, val savesPath: String) {
+class ButterscotchDroidRunner(val dataWinPath: String, val savesPath: String, val osType: Int) {
     companion object {
         private const val TAG = "ButterscotchRenderLoop"
 
@@ -49,7 +49,7 @@ class ButterscotchDroidRunner(val dataWinPath: String, val savesPath: String) {
                 if (!runnerStarted) {
                     // We only start the runner here because we NEED to have an EGL context, because the GLRenderer needs it on glInit
                     Log.i(TAG, "Starting runner...")
-                    ButterscotchNative.startRunner(dataWinPath, savesPath)
+                    ButterscotchNative.startRunner(dataWinPath, savesPath, osType)
                     runnerStarted = true
                 }
 

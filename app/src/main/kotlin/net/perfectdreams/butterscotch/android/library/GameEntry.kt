@@ -21,7 +21,38 @@ data class GameEntry(
     val portraitLayout: UUID = LayoutLibrary.DEFAULT_PORTRAIT_LAYOUT,
     @Serializable(with = UUIDAsStringSerializer::class)
     val landscapeLayout: UUID = LayoutLibrary.DEFAULT_LANDSCAPE_LAYOUT,
+    /** OS reported to the game through GML's os_type / os_* builtins. Defaults to Windows, which is what the C runner hardcoded before this was selectable. */
+    val runnerOs: RunnerOs = RunnerOs.WINDOWS,
 ) {
+    // Mirrors the YoYoOperatingSystem enum in Butterscotch's runner.h. nativeValue MUST match the
+    // C enum's integer value, since it is passed straight through startRunner to runner->osType.
+    // The OS_LLVM_* debug variants (65536+) are intentionally omitted; they are internal build
+    // flavors, not meaningful targets to pick for a WAD.
+    @Serializable
+    enum class RunnerOs(val nativeValue: Int, val fancyName: String) {
+        WINDOWS(0, "Windows"),
+        MACOSX(1, "macOS"),
+        PSP(2, "PSP"),
+        IOS(3, "iOS"),
+        ANDROID(4, "Android"),
+        SYMBIAN(5, "Symbian"),
+        LINUX(6, "Linux"),
+        WINPHONE(7, "Windows Phone"),
+        TIZEN(8, "Tizen"),
+        WIN8NATIVE(9, "Windows 8 Native"),
+        WIIU(10, "Wii U"),
+        THREEDS(11, "3DS"),
+        PSVITA(12, "PS Vita"),
+        BB10(13, "BlackBerry 10"),
+        PS4(14, "PS4"),
+        XBOXONE(15, "Xbox One"),
+        PS3(16, "PS3"),
+        XBOX360(17, "Xbox 360"),
+        UWP(18, "UWP"),
+        AMAZON(19, "Amazon"),
+        SWITCH(20, "Switch"),
+    }
+
     @Serializable
     sealed class GameType {
         @Serializable
