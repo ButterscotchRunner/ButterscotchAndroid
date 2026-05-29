@@ -11,17 +11,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -37,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -50,6 +50,11 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.atan2
 import kotlin.math.min
 import kotlin.math.sqrt
+import java.util.UUID
+import net.perfectdreams.butterscotch.android.layouts.GamepadElement
+import net.perfectdreams.butterscotch.android.layouts.GamepadLayout
+import net.perfectdreams.butterscotch.android.layouts.InputBinding
+import net.perfectdreams.butterscotch.android.layouts.KeyTrigger
 
 // GameMaker vk_* constants. Match the keycodes the runner already understands from a USB keyboard,
 // so the C side doesn't need a touch-specific path - virtual joystick presses become regular key events.
@@ -61,49 +66,60 @@ private const val KEY_C     = 67
 private const val KEY_X     = 88
 private const val KEY_Z     = 90
 
-/**
- * Tracks which virtual keys are currently held and forwards only edge transitions to JNI.
- * Without this, a finger dragging across the joystick would re-fire "key down" on every pointer
- * move event, which would spuriously re-trigger GameMaker's `keyboard_check_pressed` flag.
- *
- * Refcounting handles the case where two pointers happen to map to the same key at once (e.g. two
- * fingers both landing on the joystick area mapped to "up"): the key stays down until *all*
- * pointers release it. Matches what the WebKT reference frontend does with pressedRefs.
- */
+// Tracks which input bindings are currently held and forwards only edge transitions to JNI.
+// Without this, a finger dragging across the joystick would re-fire "key down" on every pointer
+// move event, which would spuriously re-trigger GameMaker's keyboard_check_pressed flag.
+//
+// Refcounting handles the case where two pointers happen to map to the same binding at once (e.g.
+// two fingers both landing on the joystick area mapped to "up"): the binding stays down until *all*
+// pointers release it. Matches what the WebKT reference frontend does with pressedRefs.
+//
+// Bindings are the digital InputBinding model (keyboard key or gamepad button). The data classes
+// give us correct equals/hashCode, so they work directly as refcount/set keys.
 class VirtualKeyState(val runner: ButterscotchDroidRunner) {
-    private val refs = HashMap<Int, Int>()
+    private val refs = HashMap<InputBinding, Int>()
 
-    // We do NOT need to use @Synchronized here because the is only one UI Thread, and we only dispatch it to a channel
+    // We do NOT need to use @Synchronized here because there is only one UI Thread, and we only dispatch it to a channel
 
-    fun acquire(keyCode: Int) {
-        val newCount = (refs[keyCode] ?: 0) + 1
-        refs[keyCode] = newCount
+    fun acquire(binding: InputBinding) {
+        val newCount = (refs[binding] ?: 0) + 1
+        refs[binding] = newCount
         if (newCount == 1) {
-            runner.onKey(keyCode, isDown = true)
+            dispatch(binding, isDown = true)
         }
     }
 
-    fun release(keyCode: Int) {
-        val newCount = (refs[keyCode] ?: return) - 1
+    fun release(binding: InputBinding) {
+        val newCount = (refs[binding] ?: return) - 1
         if (newCount <= 0) {
-            refs.remove(keyCode)
-            runner.onKey(keyCode, isDown = false)
+            refs.remove(binding)
+            dispatch(binding, isDown = false)
         } else {
-            refs[keyCode] = newCount
+            refs[binding] = newCount
         }
     }
 
-    /** Apply a new "currently-pressed" set for a single pointer, emitting only the delta. */
-    fun transition(oldKeys: Set<Int>, newKeys: Set<Int>) {
+    // Apply a new "currently-pressed" set for a single pointer, emitting only the delta.
+    fun transition(oldKeys: Set<InputBinding>, newKeys: Set<InputBinding>) {
         if (oldKeys == newKeys) return
         for (k in oldKeys) if (k !in newKeys) release(k)
         for (k in newKeys) if (k !in oldKeys) acquire(k)
     }
 
     fun releaseAll() {
-        for ((k, _) in refs)
-            runner.onKey(k, isDown = false)
+        for ((binding, _) in refs)
+            dispatch(binding, isDown = false)
         refs.clear()
+    }
+
+    // Forward a binding edge to the runner. Keyboard goes through the existing key path. Gamepad
+    // buttons have no host->runner transport yet (that needs a gamepad JNI bridge), so they are
+    // dropped for now - the current default layout only uses keyboard bindings.
+    private fun dispatch(binding: InputBinding, isDown: Boolean) {
+        when (binding) {
+            is InputBinding.Keyboard -> runner.onKey(binding.vk, isDown)
+            is InputBinding.GamepadButton -> {} // TODO: wire once the gamepad axis/button JNI bridge exists
+        }
     }
 }
 
@@ -114,47 +130,92 @@ class VirtualKeyState(val runner: ButterscotchDroidRunner) {
  *
  * The caller owns the [VirtualKeyState] so it can release all held keys on lifecycle events (e.g.
  * the menu opening, or an orientation change recomposing the layout).
+ *
+ * We do not load or edit layouts yet, so this renders the built-in [defaultGamepadLayout], which
+ * reproduces the old hardcoded joystick + C/X/Z gamepad expressed through the layout model.
  */
 @Composable
 fun GameControls(keys: VirtualKeyState, modifier: Modifier = Modifier) {
-    BoxWithConstraints(modifier) {
-        // Scale every control dimension off the smaller of width/height so the gamepad reads at the
-        // right size whether the parent is a landscape Overlay (whole screen) or a Stacked-portrait
-        // controls strip (narrow + tall). The min/max clamps stop controls from becoming tiny on
-        // phones or absurdly large on tablets.
-        //
-        // For reference, on a ~360dp-wide portrait phone in Stacked mode the strip's min dimension
-        // is ~360dp, giving joystick ~150dp and buttons ~79dp. Without the row-versus-column switch
-        // below, joystick (~150) + 3 buttons (~237) + paddings would still overflow 360, which was
-        // the original bug. The switch reroutes the buttons into a vertical column whenever the
-        // available width can't host both side-by-side with breathing room.
-        val ref = if (maxWidth < maxHeight) maxWidth else maxHeight
-        val joystickSize = (ref * 0.42f).coerceIn(140.dp, 200.dp)
-        val buttonSize   = (ref * 0.22f).coerceIn(56.dp, 80.dp)
-        val buttonGap    = buttonSize * 0.22f
-        val edgePad      = (ref * 0.05f).coerceIn(16.dp, 32.dp)
-        // Threshold: joystick + 3 buttons side-by-side + 2 gaps + 3 paddings. If that doesn't fit,
-        // stack the action buttons vertically so the joystick keeps its size and they stop colliding.
-        val rowActionsWidth = joystickSize + buttonSize * 3 + buttonGap * 2 + edgePad * 3
-        val verticalActions = rowActionsWidth > maxWidth
+    GamepadLayoutView(defaultGamepadLayout, keys, modifier)
+}
 
-        Joystick(
-            keys = keys,
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(edgePad)
-                .size(joystickSize)
-        )
-        ActionButtons(
-            keys = keys,
-            buttonSize = buttonSize,
-            gap = buttonGap,
-            vertical = verticalActions,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(edgePad)
-        )
+// Renders a GamepadLayout into the given area. Element geometry follows the model contract:
+// position is a 0..1 fraction of the overlay width (X) / height (Y) measured from the element
+// center, and scale is a fraction of min(width, height) applied to both dimensions (so circular
+// controls stay circular on any overlay aspect). opacity is purely visual - alpha() does not gate
+// pointer input, so an opacity-0 element is still tappable (useful later for skin hit zones).
+@Composable
+private fun GamepadLayoutView(layout: GamepadLayout, keys: VirtualKeyState, modifier: Modifier = Modifier) {
+    BoxWithConstraints(modifier) {
+        val ref = if (maxWidth < maxHeight) maxWidth else maxHeight
+        layout.element.forEach { element ->
+            val sizeDp = ref * element.scale.toFloat()
+            val centerX = maxWidth * element.positionX.toFloat()
+            val centerY = maxHeight * element.positionY.toFloat()
+            val placement = Modifier
+                .offset(x = centerX - sizeDp / 2f, y = centerY - sizeDp / 2f)
+                .size(sizeDp)
+                .alpha(element.opacity.toFloat())
+
+            when (element) {
+                is GamepadElement.Joystick -> Joystick(
+                    up = element.up,
+                    down = element.down,
+                    left = element.left,
+                    right = element.right,
+                    keys = keys,
+                    modifier = placement
+                )
+                is GamepadElement.Key -> ActionButton(
+                    label = element.label ?: defaultLabelFor(element.binding),
+                    binding = element.binding,
+                    type = element.type,
+                    keys = keys,
+                    modifier = placement
+                )
+                // Analog sticks need a continuous gamepad-axis transport that does not exist yet, so
+                // they are not rendered. The default layout contains none.
+                is GamepadElement.AnalogJoystick -> {}
+            }
+        }
     }
+}
+
+// Stable id for the built-in layout. We do not persist or load layouts yet; this is the hardcoded
+// equivalent of the old fixed gamepad. Positions approximate the original adaptive bottom-left
+// joystick + bottom-right C/X/Z cluster; a fixed layout cannot reproduce the old min/max size
+// clamps or the row-to-column reflow, which is an accepted trade for being data-driven.
+private val defaultGamepadLayout = GamepadLayout(
+    id = UUID.fromString("00000000-0000-0000-0000-000000000001"),
+    orientation = GamepadLayout.GamepadTargetOrientation.LANDSCAPE,
+    element = listOf(
+        GamepadElement.Joystick(
+            positionX = 0.16, positionY = 0.74, scale = 0.42, opacity = 1.0,
+            up = InputBinding.Keyboard(KEY_UP),
+            down = InputBinding.Keyboard(KEY_DOWN),
+            left = InputBinding.Keyboard(KEY_LEFT),
+            right = InputBinding.Keyboard(KEY_RIGHT),
+        ),
+        GamepadElement.Key(positionX = 0.66, positionY = 0.78, scale = 0.22, opacity = 1.0, label = null, type = KeyTrigger.Press, binding = InputBinding.Keyboard(KEY_C)),
+        GamepadElement.Key(positionX = 0.79, positionY = 0.78, scale = 0.22, opacity = 1.0, label = null, type = KeyTrigger.Press, binding = InputBinding.Keyboard(KEY_X)),
+        GamepadElement.Key(positionX = 0.92, positionY = 0.78, scale = 0.22, opacity = 1.0, label = null, type = KeyTrigger.Press, binding = InputBinding.Keyboard(KEY_Z)),
+    )
+)
+
+// Fallback label for a Key whose label is null. Keyboard letters/digits show their glyph; arrows
+// show an arrow symbol; anything else falls back to its raw code. Gamepad buttons have no natural
+// glyph, so they show a placeholder until we have real button artwork.
+private fun defaultLabelFor(binding: InputBinding): String = when (binding) {
+    is InputBinding.Keyboard -> when (binding.vk) {
+        in 48..57, in 65..90 -> binding.vk.toChar().toString() // 0-9, A-Z (ASCII)
+        KEY_LEFT  -> "←"
+        KEY_UP    -> "↑"
+        KEY_RIGHT -> "→"
+        KEY_DOWN  -> "↓"
+        32        -> "␣"
+        else      -> binding.vk.toString()
+    }
+    is InputBinding.GamepadButton -> "B${binding.button}"
 }
 
 /**
@@ -350,22 +411,29 @@ private fun MenuItem(label: String, onClick: () -> Unit) {
  * Visually, the thumb glyph follows the finger (clamped to the base radius) for tactile feedback.
  */
 @Composable
-private fun Joystick(keys: VirtualKeyState, modifier: Modifier = Modifier) {
+private fun Joystick(
+    up: InputBinding,
+    down: InputBinding,
+    left: InputBinding,
+    right: InputBinding,
+    keys: VirtualKeyState,
+    modifier: Modifier = Modifier
+) {
     var thumbOffset by remember { mutableStateOf(Offset.Zero) }
 
     Box(
         modifier = modifier
             .clip(CircleShape)
             .background(Color.White.copy(alpha = 0.18f))
-            .pointerInput(Unit) {
+            .pointerInput(up, down, left, right) {
                 awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    down.consume()
+                    val downPointer = awaitFirstDown(requireUnconsumed = false)
+                    downPointer.consume()
                     val center = Offset(size.width / 2f, size.height / 2f)
                     val radiusPx = min(size.width, size.height) / 2f
                     val deadzonePx = radiusPx * 0.30f
 
-                    var currentKeys = emptySet<Int>()
+                    var currentKeys = emptySet<InputBinding>()
 
                     fun update(position: Offset) {
                         val delta = position - center
@@ -389,16 +457,16 @@ private fun Joystick(keys: VirtualKeyState, modifier: Modifier = Modifier) {
                             // Angle is normalized to [0, 360) where 0=right, 90=down, 180=left, 270=up.
                             val angleDeg = (Math.toDegrees(atan2(delta.y, delta.x).toDouble()) + 360.0) % 360.0
                             val cardinalHalfWidth = 30.0  // cardinal zone = +-30 around its axis
-                            newKeysForAngle(angleDeg, cardinalHalfWidth)
+                            bindingsForAngle(angleDeg, cardinalHalfWidth, up, down, left, right)
                         }
                         keys.transition(currentKeys, newKeys)
                         currentKeys = newKeys
                     }
 
-                    update(down.position)
+                    update(downPointer.position)
                     while (true) {
                         val event = awaitPointerEvent(PointerEventPass.Main)
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        val change = event.changes.firstOrNull { it.id == downPointer.id } ?: break
                         if (!change.pressed) {
                             change.consume()
                             break
@@ -438,77 +506,62 @@ private fun Joystick(keys: VirtualKeyState, modifier: Modifier = Modifier) {
 private fun androidx.compose.ui.input.pointer.PointerInputChange.positionChanged(): Boolean =
     position != previousPosition
 
-/**
- * Map a normalized polar angle (0..360, 0=right, 90=down) to the arrow-key set for that direction,
- * using asymmetric sectors: cardinals get `2 * cardinalHalfWidth` degrees, diagonals get the rest.
- *
- * With cardinalHalfWidth=30, each cardinal covers 60 degrees and each diagonal covers 30 degrees -
- * so as long as the finger is within 30 degrees of "straight down", we emit pure DOWN with no
- * spurious LEFT/RIGHT companion press.
- */
-private fun newKeysForAngle(angleDeg: Double, cardinalHalfWidth: Double): Set<Int> = when {
-    angleDeg < cardinalHalfWidth || angleDeg >= 360.0 - cardinalHalfWidth -> setOf(KEY_RIGHT)
-    angleDeg < 90.0 - cardinalHalfWidth                                    -> setOf(KEY_RIGHT, KEY_DOWN)
-    angleDeg < 90.0 + cardinalHalfWidth                                    -> setOf(KEY_DOWN)
-    angleDeg < 180.0 - cardinalHalfWidth                                   -> setOf(KEY_DOWN, KEY_LEFT)
-    angleDeg < 180.0 + cardinalHalfWidth                                   -> setOf(KEY_LEFT)
-    angleDeg < 270.0 - cardinalHalfWidth                                   -> setOf(KEY_LEFT, KEY_UP)
-    angleDeg < 270.0 + cardinalHalfWidth                                   -> setOf(KEY_UP)
-    else                                                                    -> setOf(KEY_UP, KEY_RIGHT)
+// Map a normalized polar angle (0..360, 0=right, 90=down) to the set of direction bindings for that
+// direction, using asymmetric sectors: cardinals get 2 * cardinalHalfWidth degrees, diagonals get
+// the rest.
+//
+// With cardinalHalfWidth=30, each cardinal covers 60 degrees and each diagonal covers 30 degrees -
+// so as long as the finger is within 30 degrees of "straight down", we emit pure DOWN with no
+// spurious LEFT/RIGHT companion press.
+private fun bindingsForAngle(
+    angleDeg: Double,
+    cardinalHalfWidth: Double,
+    up: InputBinding,
+    down: InputBinding,
+    left: InputBinding,
+    right: InputBinding
+): Set<InputBinding> = when {
+    angleDeg < cardinalHalfWidth || angleDeg >= 360.0 - cardinalHalfWidth -> setOf(right)
+    angleDeg < 90.0 - cardinalHalfWidth                                    -> setOf(right, down)
+    angleDeg < 90.0 + cardinalHalfWidth                                    -> setOf(down)
+    angleDeg < 180.0 - cardinalHalfWidth                                   -> setOf(down, left)
+    angleDeg < 180.0 + cardinalHalfWidth                                   -> setOf(left)
+    angleDeg < 270.0 - cardinalHalfWidth                                   -> setOf(left, up)
+    angleDeg < 270.0 + cardinalHalfWidth                                   -> setOf(up)
+    else                                                                    -> setOf(up, right)
 }
 
 // ===[ Action Buttons ]===
 
+// A single round action button. The renderer sizes/positions it via [modifier] (which already
+// carries the resolved size, offset, and opacity from the layout), so this only owns its look and
+// press gesture.
+//
+// [type] is currently always Press: hold the binding while the pointer is down. RapidFire is part
+// of the model but not wired yet - it needs a per-frame tick to emit repeat pulses, which the
+// edge-only input pipeline does not have.
 @Composable
-private fun ActionButtons(
+private fun ActionButton(
+    label: String,
+    binding: InputBinding,
+    type: KeyTrigger,
     keys: VirtualKeyState,
-    buttonSize: Dp,
-    gap: Dp,
-    vertical: Boolean,
     modifier: Modifier = Modifier
 ) {
-    // Layout direction matters for the visual reading of "primary action goes last": in a Row the
-    // primary key (Z) sits rightmost; in a Column we want it bottommost so the thumb's resting
-    // position naturally falls on the most-used button. Same key order in source, different visual
-    // result based on `vertical`.
-    if (vertical) {
-        Column(
-            modifier = modifier,
-            verticalArrangement = Arrangement.spacedBy(gap)
-        ) {
-            ActionButton("C", KEY_C, keys, buttonSize)
-            ActionButton("X", KEY_X, keys, buttonSize)
-            ActionButton("Z", KEY_Z, keys, buttonSize)
-        }
-    } else {
-        Row(
-            modifier = modifier,
-            horizontalArrangement = Arrangement.spacedBy(gap)
-        ) {
-            ActionButton("C", KEY_C, keys, buttonSize)
-            ActionButton("X", KEY_X, keys, buttonSize)
-            ActionButton("Z", KEY_Z, keys, buttonSize)  // Rightmost = primary action (Z confirms in Undertale/DR)
-        }
-    }
-}
-
-@Composable
-private fun ActionButton(label: String, keyCode: Int, keys: VirtualKeyState, size: Dp) {
     var pressed by remember { mutableStateOf(false) }
     Box(
-        modifier = Modifier
-            .size(size)
+        modifier = modifier
             .clip(CircleShape)
             .background(
                 if (pressed) Color.White.copy(alpha = 0.45f)
                 else Color.White.copy(alpha = 0.22f)
             )
-            .pointerInput(keyCode) {
+            .pointerInput(binding) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     down.consume()
                     pressed = true
-                    keys.acquire(keyCode)
+                    keys.acquire(binding)
                     try {
                         // Hold the press as long as this specific pointer stays down. We don't care
                         // about position once it's grabbed - sliding off the button still keeps the
@@ -523,7 +576,7 @@ private fun ActionButton(label: String, keyCode: Int, keys: VirtualKeyState, siz
                         }
                     } finally {
                         pressed = false
-                        keys.release(keyCode)
+                        keys.release(binding)
                     }
                 }
             },
