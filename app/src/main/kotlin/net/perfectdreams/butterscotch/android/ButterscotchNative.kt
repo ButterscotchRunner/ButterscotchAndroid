@@ -25,6 +25,9 @@ import kotlinx.coroutines.channels.Channel
  * thread; Compose's snapshot system handles the cross-thread state write safely.
  */
 object ButterscotchNative {
+    const val BUTTERSCOTCH_DROID_CONTINUE = 0
+    const val BUTTERSCOTCH_DROID_SHOULD_EXIT = 1
+
     init {
         System.loadLibrary("butterscotch")
         init()
@@ -79,7 +82,7 @@ object ButterscotchNative {
      * [winW]/[winH] are the current EGL window surface dimensions. [audioDtSeconds] is the time
      * since the previous frame in seconds — used to advance the audio system.
      */
-    external fun stepAndDraw(winW: Int, winH: Int, audioDtSeconds: Float): Boolean
+    external fun stepAndDraw(winW: Int, winH: Int, audioDtSeconds: Float): Int
 
     /**
      * The current room's tick rate in Hz (GM:S `room_speed`). Returns 0 if no room is active yet.

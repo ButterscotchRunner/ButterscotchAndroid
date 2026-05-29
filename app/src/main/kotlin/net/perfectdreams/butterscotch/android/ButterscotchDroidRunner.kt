@@ -65,32 +65,42 @@ class ButterscotchDroidRunner(val dataWinPath: String, val savesPath: String) {
 
                     ButterscotchNative.beginFrame()
                     drainPendingInput()
-                    val keepRunning = ButterscotchNative.stepAndDraw(egl.width, egl.height, audioDt)
-                    egl.swapBuffers()
+                    val stepStatus = ButterscotchNative.stepAndDraw(egl.width, egl.height, audioDt)
 
-                    if (!keepRunning)
-                        break // Game requested exit
+                    when (stepStatus) {
+                        ButterscotchNative.BUTTERSCOTCH_DROID_CONTINUE -> {
+                            egl.swapBuffers()
 
-                    val hz = ButterscotchNative.getTargetFrameHz()
-                    if (hz > 0) {
-                        val targetNs = 1_000_000_000L / hz
-                        val nextDeadline = lastFrameNs + targetNs
-                        val remaining = nextDeadline - System.nanoTime()
-                        if (remaining > 2_000_000L) {
-                            Thread.sleep((remaining - 1_000_000L) / 1_000_000L)
+                            val hz = ButterscotchNative.getTargetFrameHz()
+                            if (hz > 0) {
+                                val targetNs = 1_000_000_000L / hz
+                                val nextDeadline = lastFrameNs + targetNs
+                                val remaining = nextDeadline - System.nanoTime()
+                                if (remaining > 2_000_000L) {
+                                    Thread.sleep((remaining - 1_000_000L) / 1_000_000L)
+                                }
+                                while (System.nanoTime() < nextDeadline) {
+                                    // spin spin spin!
+                                }
+                                lastFrameNs = nextDeadline
+                            } else {
+                                lastFrameNs = System.nanoTime()
+                            }
+
+                            // Yield so other tasks (like our clean up task) can be executed
+                            // The reason for that is because we don't have any suspension points here on the loop, because Butterscotch sleeps the thread
+                            // (probably my first time using yield tbh)
+                            yield()
                         }
-                        while (System.nanoTime() < nextDeadline) {
-                            // spin spin spin!
+
+                        ButterscotchNative.BUTTERSCOTCH_DROID_SHOULD_EXIT -> {
+                            // Game requested exit
+                            requestExitInternal()
+                            break
                         }
-                        lastFrameNs = nextDeadline
-                    } else {
-                        lastFrameNs = System.nanoTime()
+                        
+                        else -> error("Unsupported return status! $stepStatus")
                     }
-
-                    // Yield so other tasks (like our clean up task) can be executed
-                    // The reason for that is because we don't have any suspension points here on the loop, because Butterscotch sleeps the thread
-                    // (probably my first time using yield tbh)
-                    yield()
                 }
             } finally {
                 egl.unbindWindow()
@@ -116,15 +126,20 @@ class ButterscotchDroidRunner(val dataWinPath: String, val savesPath: String) {
             withContext(glDispatcher) {
                 renderJob?.cancelAndJoin()
 
-                ButterscotchNative.stopRunner()
-                egl.teardown()
-                ButterscotchNative.markExited()
-
-                renderJob = null
-                started = false
-                runnerStarted = false
+                requestExitInternal()
             }
         }
+    }
+
+    // Should ONLY be called in the render thread!
+    fun requestExitInternal() {
+        ButterscotchNative.stopRunner()
+        egl.teardown()
+        ButterscotchNative.markExited()
+
+        renderJob = null
+        started = false
+        runnerStarted = false
     }
 
     sealed interface InputEvent {
