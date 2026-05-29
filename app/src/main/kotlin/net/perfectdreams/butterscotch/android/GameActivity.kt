@@ -163,13 +163,11 @@ class GameActivity : ComponentActivity() {
                     val layoutLib = Libraries.getLayoutLibrary()
                     val isPortrait = constraints.maxHeight >= constraints.maxWidth
 
-                    // Re-read the entry from the (snapshot-backed) library rather than the onCreate
-                    // capture, so a Save As repoint of portraitLayout/landscapeLayout is visible here.
-                    val liveEntry = library.findById(gameId) ?: entry
-                    // Resolve this game's assigned layout for the current orientation, falling back to
-                    // the built-in default if the id is missing. Keyed on (isPortrait, assignedId) so it
-                    // re-resolves on rotation AND when the assignment changes (e.g. after Save As). An
-                    // Overlay/Stacked reflow changes neither, so in-progress edits survive it.
+                    val liveEntry = requireNotNull(library.findById(gameId))
+
+                    // Resolve this game's assigned layout for the current orientation, falling back to the built-in default if the id is missing.
+                    // Keyed on (isPortrait, assignedId) so it  re-resolves on rotation AND when the assignment changes (after Save As).
+                    // An Overlay/Stacked reflow changes neither, so in-progress edits survive it.
                     val assignedId = if (isPortrait) liveEntry.portraitLayout else liveEntry.landscapeLayout
                     val fallbackId = if (isPortrait) LayoutLibrary.DEFAULT_PORTRAIT_LAYOUT else LayoutLibrary.DEFAULT_LANDSCAPE_LAYOUT
 
