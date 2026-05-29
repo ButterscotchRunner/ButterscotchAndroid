@@ -156,15 +156,23 @@ fun BoxWithConstraintsScope.GamepadEditor(
                     DropdownMenuItem(text = { Text("Button") }, onClick = {
                         addMenuExpanded = false
                         add(GamepadElement.Key(
-                            positionX = 0.5, positionY = 0.5, scale = 0.22, opacity = 1.0,
-                            label = null, trigger = KeyTrigger.Press, binding = InputBinding.Keyboard(GmlKey.Z.code),
+                            positionX = 0.5,
+                            positionY = 0.5,
+                            scale = 0.22,
+                            opacity = 1.0,
+                            label = null,
+                            trigger = KeyTrigger.Press,
+                            binding = InputBinding.Keyboard(GmlKey.Z.code),
                             id = UUID.randomUUID()
                         ))
                     })
                     DropdownMenuItem(text = { Text("Joystick") }, onClick = {
                         addMenuExpanded = false
                         add(GamepadElement.Joystick(
-                            positionX = 0.5, positionY = 0.5, scale = 0.42, opacity = 1.0,
+                            positionX = 0.5,
+                            positionY = 0.5,
+                            scale = 0.42,
+                            opacity = 1.0,
                             up = InputBinding.Keyboard(GmlKey.UP.code),
                             down = InputBinding.Keyboard(GmlKey.DOWN.code),
                             left = InputBinding.Keyboard(GmlKey.LEFT.code),
