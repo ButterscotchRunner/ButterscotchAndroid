@@ -282,11 +282,19 @@ class GameActivity : ComponentActivity() {
                         }
                         LayoutMode.Stacked -> {
                             Column(Modifier.fillMaxSize()) {
-                                gameSurface(
+                                Box(
                                     Modifier
                                         .fillMaxWidth()
-                                        .aspectRatio(contentAspect)
-                                )
+                                        .weight(1f),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    gameSurface(
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .aspectRatio(contentAspect)
+                                    )
+                                }
+
                                 GameControls(
                                     layout = layout,
                                     editMode = editMode,
