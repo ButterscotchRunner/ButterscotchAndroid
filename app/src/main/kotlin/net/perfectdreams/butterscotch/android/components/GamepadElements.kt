@@ -84,7 +84,7 @@ fun FastForwardButton(
     Box(
         modifier = modifier
             .clip(CircleShape)
-            .background(if (isActive) Color.Yellow.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.22f))
+            .background(if (isActive) ButterscotchPrimary.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.22f))
             .pointerInput(Unit) {
                 if (interactive) {
                     awaitEachGesture {
@@ -136,8 +136,7 @@ fun ActionButton(
         modifier = modifier
             .clip(CircleShape)
             .background(
-                if (pressed) Color.White.copy(alpha = 0.45f)
-                else Color.White.copy(alpha = 0.22f)
+                if (pressed) ButterscotchPrimary.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.22f)
             )
             .pointerInput(binding) {
                 if (interactive) {
@@ -280,12 +279,11 @@ fun Joystick(
                     }
 
                     update(downPointer.position)
+                    holding.value = true
                     while (true) {
-                        holding.value = true
                         val event = awaitPointerEvent(PointerEventPass.Main)
                         val change = event.changes.firstOrNull { it.id == downPointer.id } ?: break
                         if (!change.pressed) {
-                            holding.value = false
                             change.consume()
                             break
                         }
@@ -295,6 +293,7 @@ fun Joystick(
                         }
                     }
                     // Pointer released or cancelled - drop all keys this joystick was holding.
+                    holding.value = false
                     keys.transition(currentKeys, emptySet())
                     thumbOffset.value = Offset.Zero
                 }
@@ -345,6 +344,7 @@ fun AnalogJoystick(
                     }
 
                     update(downPointer.position)
+                    holding.value = true
                     while (true) {
                         val event = awaitPointerEvent(PointerEventPass.Main)
                         val change = event.changes.firstOrNull { it.id == downPointer.id } ?: break
@@ -358,6 +358,7 @@ fun AnalogJoystick(
                         }
                     }
                     // Pointer released or cancelled - re-center the stick.
+                    holding.value = false
                     keys.setAxis(device, stick.horizontalAxisIndex, 0f)
                     keys.setAxis(device, stick.verticalAxisIndex, 0f)
                     thumbOffset.value = Offset.Zero
