@@ -76,4 +76,15 @@ sealed class GamepadElement {
         /** Which controller slot (0-based) this stick feeds. The on-screen pad is player 1 by default. */
         val device: Int = 0,
     ) : GamepadElement()
+
+    @Serializable
+    @SerialName("Menu")
+    data class Menu(
+        @Serializable(with = UUIDAsStringSerializer::class)
+        override val id: UUID,
+        override val positionX: Double,
+        override val positionY: Double,
+        override val scale: Double,
+        override val opacity: Double,
+    ) : GamepadElement()
 }

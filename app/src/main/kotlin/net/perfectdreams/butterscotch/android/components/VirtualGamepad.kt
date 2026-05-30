@@ -33,6 +33,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -41,6 +43,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -106,6 +109,7 @@ fun GameControls(
     canSave: Boolean,
     onSave: () -> Unit,
     onSaveAs: (String) -> Unit,
+    onMenuOpen: () -> (Unit),
     keys: VirtualKeyState,
     modifier: Modifier = Modifier
 ) {
@@ -120,7 +124,9 @@ fun GameControls(
                 onSaveAs = onSaveAs
             )
         } else {
-            PlayableGamepad(layout = layout, keys = keys)
+            PlayableGamepad(layout = layout, keys = keys) {
+                onMenuOpen.invoke()
+            }
         }
     }
 }
@@ -157,7 +163,7 @@ fun defaultLabelFor(binding: InputBinding): String = when (binding) {
 // The playable controls: each element renders as its interactive composable, dispatching input
 // through [keys]. No edit affordances here at all.
 @Composable
-private fun BoxWithConstraintsScope.PlayableGamepad(layout: GamepadLayout, keys: VirtualKeyState) {
+private fun BoxWithConstraintsScope.PlayableGamepad(layout: GamepadLayout, keys: VirtualKeyState, onMenuOpen: () -> (Unit)) {
     layout.element.forEach { element ->
         val placement = placementOf(element).alpha(element.opacity.toFloat())
         when (element) {
@@ -182,6 +188,30 @@ private fun BoxWithConstraintsScope.PlayableGamepad(layout: GamepadLayout, keys:
                 keys = keys,
                 modifier = placement
             )
+
+            is GamepadElement.Menu -> {
+                Box(
+                    modifier = placement
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.22f))
+                        .pointerInput(Unit) {
+                            awaitEachGesture {
+                                val down = awaitFirstDown(requireUnconsumed = false)
+                                down.consume()
+                                onMenuOpen.invoke()
+                            }
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Menu,
+                        contentDescription = "Open menu",
+                        tint = Color.White,
+                        // The Box is sized by placement (scale * shorter side), so size the glyph as a fraction of it
+                        modifier = Modifier.fillMaxSize(0.55f)
+                    )
+                }
+            }
         }
     }
 }
@@ -212,41 +242,12 @@ fun MenuOverlay(
     }
 
     Box(modifier.fillMaxSize()) {
-        MenuButton(
-            onClick = { onMenuToggle.invoke(true) },
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(16.dp)
-        )
         // MenuSidebar is a BoxScope extension so it can align the panel to the right edge.
         MenuSidebar(
             open = menuOpen,
             onDismiss = { onMenuToggle.invoke(false) },
             onExitGame = onExitGame,
             onEditLayout = onEditLayout
-        )
-    }
-}
-
-/**
- * Hamburger button that opens the menu sidebar. We use Compose's regular [clickable] (not a raw
- * pointer-input gesture) because it gives us ripple + accessibility for free, and we want a proper
- * tap (down + up without movement) rather than press-and-hold semantics.
- */
-@Composable
-private fun MenuButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .size(48.dp)
-            .clip(CircleShape)
-            .background(Color.Black.copy(alpha = 0.45f))
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = "☰",  // ☰
-            color = Color.White,
-            style = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold)
         )
     }
 }

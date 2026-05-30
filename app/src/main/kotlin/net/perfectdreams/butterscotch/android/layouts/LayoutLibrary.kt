@@ -60,6 +60,7 @@ class LayoutLibrary private constructor(
                         GamepadElement.Key(positionX = 0.66, positionY = 0.78, scale = 0.22, opacity = 1.0, label = null, trigger = KeyTrigger.Press, binding = InputBinding.Keyboard(GmlKey.C.code), id = UUID.randomUUID()),
                         GamepadElement.Key(positionX = 0.79, positionY = 0.78, scale = 0.22, opacity = 1.0, label = null, trigger = KeyTrigger.Press, binding = InputBinding.Keyboard(GmlKey.X.code), id = UUID.randomUUID()),
                         GamepadElement.Key(positionX = 0.92, positionY = 0.78, scale = 0.22, opacity = 1.0, label = null, trigger = KeyTrigger.Press, binding = InputBinding.Keyboard(GmlKey.Z.code), id = UUID.randomUUID()),
+                        GamepadElement.Menu(positionX = 0.30, positionY = 0.30, scale = 0.22, opacity = 1.0, id = UUID.randomUUID()),
                     )
                 ),
                 GamepadLayout(

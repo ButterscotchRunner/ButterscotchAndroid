@@ -44,7 +44,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import net.perfectdreams.butterscotch.android.layouts.Gamepad
-import net.perfectdreams.butterscotch.android.layouts.Gamepad.Button
 import net.perfectdreams.butterscotch.android.layouts.GamepadElement
 import net.perfectdreams.butterscotch.android.layouts.GamepadLayout
 import net.perfectdreams.butterscotch.android.layouts.GamepadStick
@@ -207,6 +206,16 @@ fun BoxWithConstraintsScope.GamepadEditor(
                             id = UUID.randomUUID()
                         ))
                     })
+                    DropdownMenuItem(text = { Text("Menu") }, onClick = {
+                        addMenuExpanded = false
+                        add(GamepadElement.Menu(
+                            positionX = 0.5,
+                            positionY = 0.5,
+                            scale = 0.22,
+                            opacity = 1.0,
+                            id = UUID.randomUUID()
+                        ))
+                    })
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -216,6 +225,8 @@ fun BoxWithConstraintsScope.GamepadEditor(
             }, enabled = canSave) { Text("Save") }
             Spacer(Modifier.height(8.dp))
             Button(onClick = { showSaveAsDialog = true }) { Text("Save As") }
+            Spacer(Modifier.height(8.dp))
+            Button(onClick = { onExitEditMode() }) { Text("Exit") }
         }
     }
 
@@ -284,6 +295,7 @@ private fun ElementEditDialog(
                     is GamepadElement.Key -> "Edit button"
                     is GamepadElement.Joystick -> "Edit joystick"
                     is GamepadElement.AnalogJoystick -> "Edit analog stick"
+                    is GamepadElement.Menu -> "Edit menu"
                 }
             )
         },
@@ -321,6 +333,8 @@ private fun ElementEditDialog(
                             Text("Right stick" + if (element.stick == GamepadStick.RIGHT) " ✓" else "")
                         }
                     }
+
+                    is GamepadElement.Menu -> {}
                 }
             }
         }
@@ -481,16 +495,19 @@ private fun GamepadElement.movedTo(px: Double, py: Double): GamepadElement = whe
     is GamepadElement.Key -> copy(positionX = px, positionY = py)
     is GamepadElement.Joystick -> copy(positionX = px, positionY = py)
     is GamepadElement.AnalogJoystick -> copy(positionX = px, positionY = py)
+    is GamepadElement.Menu -> copy(positionX = px, positionY = py)
 }
 private fun GamepadElement.withScale(s: Double): GamepadElement = when (this) {
     is GamepadElement.Key -> copy(scale = s)
     is GamepadElement.Joystick -> copy(scale = s)
     is GamepadElement.AnalogJoystick -> copy(scale = s)
+    is GamepadElement.Menu -> copy(scale = s)
 }
 private fun GamepadElement.withOpacity(o: Double): GamepadElement = when (this) {
     is GamepadElement.Key -> copy(opacity = o)
     is GamepadElement.Joystick -> copy(opacity = o)
     is GamepadElement.AnalogJoystick -> copy(opacity = o)
+    is GamepadElement.Menu -> copy(opacity = o)
 }
 
 // Read the integer code behind a binding (keyboard vk or gamepad button number), used to find the
@@ -505,4 +522,5 @@ private fun editLabelFor(element: GamepadElement): String = when (element) {
     is GamepadElement.Key -> element.label ?: defaultLabelFor(element.binding)
     is GamepadElement.Joystick -> "✛"
     is GamepadElement.AnalogJoystick -> "◉"
+    is GamepadElement.Menu -> "Menu"
 }

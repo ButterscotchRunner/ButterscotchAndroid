@@ -223,6 +223,9 @@ class GameActivity : ComponentActivity() {
                                     canSave = canSave,
                                     onSave = onSave,
                                     onSaveAs = onSaveAs,
+                                    onMenuOpen = {
+                                        menuOpen = true
+                                    },
                                     keys = keys,
                                     modifier = Modifier.fillMaxSize()
                                 )
@@ -243,6 +246,9 @@ class GameActivity : ComponentActivity() {
                                     canSave = canSave,
                                     onSave = onSave,
                                     onSaveAs = onSaveAs,
+                                    onMenuOpen = {
+                                        menuOpen = true
+                                    },
                                     keys = keys,
                                     modifier = Modifier
                                         .fillMaxWidth()
