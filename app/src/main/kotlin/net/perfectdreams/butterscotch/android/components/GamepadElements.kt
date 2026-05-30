@@ -1,5 +1,9 @@
 package net.perfectdreams.butterscotch.android.components
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.EaseOut
+import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -14,11 +18,13 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,6 +43,7 @@ import net.perfectdreams.butterscotch.android.layouts.GamepadStick
 import net.perfectdreams.butterscotch.android.layouts.InputBinding
 import net.perfectdreams.butterscotch.android.layouts.KeyTrigger
 import net.perfectdreams.butterscotch.android.theme.ButterscotchPrimary
+import kotlinx.coroutines.flow.collectLatest
 import kotlin.math.atan2
 import kotlin.math.min
 import kotlin.math.sqrt
@@ -189,9 +196,22 @@ fun JoystickBase(
     modifier: Modifier = Modifier,
     modifierWithOffset: Modifier.(holdingState: MutableState<Boolean>, thumbOffset: MutableState<Offset>) -> Modifier
 ) {
+    // The gesture writes the live finger target here, but the rendering is handled by thumb below
     val thumbOffset = remember { mutableStateOf(Offset.Zero) }
     val holding = remember { mutableStateOf(false) }
     val color = if (holding.value) ButterscotchPrimary else Color.White
+
+    // This is the REAL position of the thumb
+    val thumb = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
+    LaunchedEffect(Unit) {
+        snapshotFlow { holding.value to thumbOffset.value }.collectLatest { (isHolding, target) ->
+            if (isHolding) {
+                thumb.snapTo(target)
+            } else {
+                thumb.animateTo(Offset.Zero, tween(durationMillis = 40, easing = EaseOut))
+            }
+        }
+    }
 
     Box(
         modifier = modifier
@@ -213,7 +233,7 @@ fun JoystickBase(
             drawCircle(
                 color = color.copy(alpha = 0.6f),
                 radius = radius * 0.40f,
-                center = center + thumbOffset.value
+                center = center + thumb.value
             )
         }
     }
@@ -292,10 +312,8 @@ fun Joystick(
                             update(change.position)
                         }
                     }
-                    // Pointer released or cancelled - drop all keys this joystick was holding.
                     holding.value = false
                     keys.transition(currentKeys, emptySet())
-                    thumbOffset.value = Offset.Zero
                 }
             }
         }
@@ -357,11 +375,9 @@ fun AnalogJoystick(
                             update(change.position)
                         }
                     }
-                    // Pointer released or cancelled - re-center the stick.
                     holding.value = false
                     keys.setAxis(device, stick.horizontalAxisIndex, 0f)
                     keys.setAxis(device, stick.verticalAxisIndex, 0f)
-                    thumbOffset.value = Offset.Zero
                 }
             }
         }
