@@ -43,6 +43,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import net.perfectdreams.butterscotch.android.VirtualKeyState
 import net.perfectdreams.butterscotch.android.layouts.Gamepad
 import net.perfectdreams.butterscotch.android.layouts.GamepadElement
 import net.perfectdreams.butterscotch.android.layouts.GamepadLayout
@@ -59,6 +60,7 @@ import java.util.UUID
 @Composable
 fun BoxWithConstraintsScope.GamepadEditor(
     layout: GamepadLayout,
+    keys: VirtualKeyState,
     onLayoutChange: (GamepadLayout) -> Unit,
     onExitEditMode: () -> Unit,
     canSave: Boolean,
@@ -130,15 +132,45 @@ fun BoxWithConstraintsScope.GamepadEditor(
                 detectTapGestures(onLongPress = { editingId = element.id })
             }
 
-        EditableElement(
-            label = editLabelFor(element),
-            selected = editingId == element.id,
-            modifier = editModifier
-        )
+        when (element) {
+            is GamepadElement.Joystick -> Joystick(
+                up = element.up,
+                down = element.down,
+                left = element.left,
+                right = element.right,
+                keys = keys,
+                interactive = false,
+                modifier = editModifier
+            )
+
+            is GamepadElement.AnalogJoystick -> AnalogJoystick(
+                stick = element.stick,
+                device = element.device,
+                keys = keys,
+                interactive = false,
+                modifier = editModifier
+            )
+
+            is GamepadElement.Key -> {
+                ActionButton(
+                    defaultLabelFor(element.binding),
+                    element.binding,
+                    element.trigger,
+                    keys,
+                    false,
+                    editModifier
+                )
+            }
+            is GamepadElement.Menu -> {
+                MenuButton(false, {}, editModifier)
+            }
+        }
     }
 
     Column(
-        modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
+        modifier = Modifier
+            .align(Alignment.TopCenter)
+            .padding(top = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
@@ -147,7 +179,9 @@ fun BoxWithConstraintsScope.GamepadEditor(
             style = TextStyle(fontSize = 13.sp)
         )
         Spacer(Modifier.height(8.dp))
-        Row(modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 16.dp)) {
+        Row(modifier = Modifier
+            .align(Alignment.CenterHorizontally)
+            .padding(top = 16.dp)) {
             Box {
                 var addMenuExpanded by remember { mutableStateOf(false) }
                 Button(onClick = { addMenuExpanded = true }) { Text("Add") }
@@ -256,26 +290,6 @@ fun BoxWithConstraintsScope.GamepadEditor(
     }
 }
 
-// A non-interactive stand-in drawn for each element while editing: a translucent circle with the
-// element's label and a selection ring. We do not reuse the playable composables here because their
-// pointer handlers would dispatch input; the edit gestures live on the wrapping modifier instead.
-@Composable
-private fun EditableElement(label: String, selected: Boolean, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .clip(CircleShape)
-            .background(Color.White.copy(alpha = 0.25f))
-            .border(
-                width = if (selected) 3.dp else 1.5.dp,
-                color = if (selected) Color(0xFF4FC3F7) else Color.White.copy(alpha = 0.7f),
-                shape = CircleShape
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(label, color = Color.White, style = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold))
-    }
-}
-
 // Editor dialog for one element: size, opacity, the bound key(s), and delete. Edits are applied live
 // through [onChange] so the change is visible behind the dialog.
 @Composable
@@ -376,7 +390,9 @@ private fun VkField(label: String, binding: InputBinding, onChange: (InputBindin
     ExposedDropdownMenuBox(
         expanded = expanded,
         onExpandedChange = { expanded = it },
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
     ) {
         OutlinedTextField(
             value = current?.label ?: binding.code().toString(),
@@ -426,7 +442,9 @@ private fun SlotField(device: Int, onChange: (Int) -> Unit) {
     ExposedDropdownMenuBox(
         expanded = expanded,
         onExpandedChange = { expanded = it },
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
     ) {
         OutlinedTextField(
             value = labelFor(device),
@@ -461,7 +479,9 @@ private fun GamepadButtonField(button: Int, onChange: (Int) -> Unit) {
     ExposedDropdownMenuBox(
         expanded = expanded,
         onExpandedChange = { expanded = it },
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
     ) {
         OutlinedTextField(
             value = current?.label ?: button.toString(),
@@ -515,12 +535,4 @@ private fun GamepadElement.withOpacity(o: Double): GamepadElement = when (this) 
 private fun InputBinding.code(): Int = when (this) {
     is InputBinding.Keyboard -> vk
     is InputBinding.GamepadButton -> button
-}
-
-// Label drawn on an element while editing.
-private fun editLabelFor(element: GamepadElement): String = when (element) {
-    is GamepadElement.Key -> element.label ?: defaultLabelFor(element.binding)
-    is GamepadElement.Joystick -> "✛"
-    is GamepadElement.AnalogJoystick -> "◉"
-    is GamepadElement.Menu -> "Menu"
 }
