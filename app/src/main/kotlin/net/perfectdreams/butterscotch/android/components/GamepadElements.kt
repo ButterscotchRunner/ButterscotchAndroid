@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.CircleShape
@@ -74,7 +75,8 @@ fun FastForwardButton(
     isActive: Boolean,
     interactive: Boolean,
     element: GamepadElement.FastForward,
-    onClick: (GamepadElement.FastForward) -> (Unit),
+    onFastForwardPress: (GamepadElement.FastForward) -> (Unit),
+    onFastForwardRelease: (GamepadElement.FastForward) -> (Unit),
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -86,7 +88,14 @@ fun FastForwardButton(
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
                         down.consume()
-                        onClick.invoke(element)
+
+                        if (!element.toggle) {
+                            onFastForwardPress.invoke(element)
+                            waitForUpOrCancellation()
+                            onFastForwardRelease.invoke(element)
+                        } else {
+                            onFastForwardPress.invoke(element)
+                        }
                     }
                 }
             },

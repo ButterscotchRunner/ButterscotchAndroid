@@ -229,6 +229,17 @@ class GameActivity : ComponentActivity() {
                         }
                         layout = forked
                     }
+                    val onFastForwardPress = { it: GamepadElement.FastForward ->
+                        if (it.toggle && fastForwardActiveButtonId == it.id) {
+                            fastForwardActiveButtonId = null
+                        } else {
+                            fastForwardActiveButtonId = it.id
+                        }
+                    }
+                    val onFastForwardRelease = { it: GamepadElement.FastForward ->
+                        if (fastForwardActiveButtonId == it.id)
+                            fastForwardActiveButtonId = null
+                    }
 
                     // We need to have this here because we NEED the current element
                     LaunchedEffect(fastForwardActiveButtonId) {
@@ -269,12 +280,8 @@ class GameActivity : ComponentActivity() {
                                     onMenuOpen = {
                                         menuOpen = true
                                     },
-                                    onFastForward = {
-                                        if (fastForwardActiveButtonId == it.id)
-                                            fastForwardActiveButtonId = null
-                                        else
-                                            fastForwardActiveButtonId = it.id
-                                    },
+                                    onFastForwardPress = onFastForwardPress,
+                                    onFastForwardRelease = onFastForwardRelease,
                                     keys = keys,
                                     modifier = Modifier.fillMaxSize()
                                 )
@@ -307,12 +314,8 @@ class GameActivity : ComponentActivity() {
                                     onMenuOpen = {
                                         menuOpen = true
                                     },
-                                    onFastForward = {
-                                        if (fastForwardActiveButtonId == it.id)
-                                            fastForwardActiveButtonId = null
-                                        else
-                                            fastForwardActiveButtonId = it.id
-                                    },
+                                    onFastForwardPress = onFastForwardPress,
+                                    onFastForwardRelease = onFastForwardRelease,
                                     keys = keys,
                                     modifier = Modifier
                                         .fillMaxWidth()

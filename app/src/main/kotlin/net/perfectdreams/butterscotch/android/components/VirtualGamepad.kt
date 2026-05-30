@@ -68,7 +68,8 @@ fun GameControls(
     onSave: () -> Unit,
     onSaveAs: (String) -> Unit,
     onMenuOpen: () -> (Unit),
-    onFastForward: (GamepadElement.FastForward) -> (Unit),
+    onFastForwardPress: (GamepadElement.FastForward) -> (Unit),
+    onFastForwardRelease: (GamepadElement.FastForward) -> (Unit),
     keys: VirtualKeyState,
     modifier: Modifier = Modifier
 ) {
@@ -84,7 +85,7 @@ fun GameControls(
                 onSaveAs = onSaveAs
             )
         } else {
-            PlayableGamepad(layout = layout, keys = keys, activeFastForwardButtonId, onFastForward) {
+            PlayableGamepad(layout = layout, keys = keys, activeFastForwardButtonId, onFastForwardPress = onFastForwardPress, onFastForwardRelease = onFastForwardRelease) {
                 onMenuOpen.invoke()
             }
         }
@@ -123,7 +124,14 @@ fun defaultLabelFor(binding: InputBinding): String = when (binding) {
 // The playable controls: each element renders as its interactive composable, dispatching input
 // through [keys]. No edit affordances here at all.
 @Composable
-private fun BoxWithConstraintsScope.PlayableGamepad(layout: GamepadLayout, keys: VirtualKeyState, activeFastForwardButtonId: UUID?, onFastForward: (GamepadElement.FastForward) -> (Unit), onMenuOpen: () -> (Unit)) {
+private fun BoxWithConstraintsScope.PlayableGamepad(
+    layout: GamepadLayout,
+    keys: VirtualKeyState,
+    activeFastForwardButtonId: UUID?,
+    onFastForwardPress: (GamepadElement.FastForward) -> (Unit),
+    onFastForwardRelease: (GamepadElement.FastForward) -> (Unit),
+    onMenuOpen: () -> (Unit)
+) {
     layout.elements.forEach { element ->
         val placement = placementOf(element).alpha(element.opacity.toFloat())
         when (element) {
@@ -169,7 +177,8 @@ private fun BoxWithConstraintsScope.PlayableGamepad(layout: GamepadLayout, keys:
                     activeFastForwardButtonId == element.id,
                     true,
                     element,
-                    onFastForward,
+                    onFastForwardPress,
+                    onFastForwardRelease,
                     placement
                 )
             }

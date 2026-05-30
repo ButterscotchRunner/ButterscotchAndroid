@@ -30,6 +30,6 @@ fun RadioButtonWithContent(selected: Boolean, onClick: () -> (Unit), content: @C
     ) {
         RadioButton(selected = selected, onClick = null)
         Spacer(Modifier.width(16.dp))
-        onClick()
+        content()
     }
 }

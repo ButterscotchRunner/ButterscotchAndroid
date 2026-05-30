@@ -35,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -166,9 +167,8 @@ fun BoxWithConstraintsScope.GamepadEditor(
                     false,
                     false,
                     element,
-                    {
-
-                    },
+                    {},
+                    {},
                     editModifier
                 )
             }
@@ -384,6 +384,18 @@ private fun ElementEditDialog(
                             steps = 1,
                             valueRange = 2f..8f
                         )
+
+                        RadioButtonWithContent(element.toggle, onClick = {
+                            onChange(element.copy(toggle = true))
+                        }) {
+                            Text("Toggle")
+                        }
+
+                        RadioButtonWithContent(!element.toggle, onClick = {
+                            onChange(element.copy(toggle = false))
+                        }) {
+                            Text("Hold")
+                        }
                     }
                 }
             }
