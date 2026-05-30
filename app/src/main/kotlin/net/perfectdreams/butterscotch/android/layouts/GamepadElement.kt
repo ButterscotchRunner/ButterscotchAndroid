@@ -8,9 +8,9 @@ import java.util.UUID
 @Serializable
 sealed class GamepadElement {
     /**
-     * Stable identity for this element, independent of its position in the layout list. The editor
-     * addresses elements by this id (drag/edit/delete) so mutating the list (add/remove) can never
-     * make an in-flight edit point at the wrong element.
+     * Stable identity for this element, independent of its position in the layout list.
+     *
+     * The editor addresses elements by this id (drag/edit/delete) so mutating the list (add/remove) can never make an in-flight edit point at the wrong element.
      */
     abstract val id: UUID
     /**
@@ -33,6 +33,8 @@ sealed class GamepadElement {
     @Serializable
     @SerialName("Key")
     data class Key(
+        @Serializable(with = UUIDAsStringSerializer::class)
+        override val id: UUID,
         override val positionX: Double,
         override val positionY: Double,
         override val scale: Double,
@@ -44,13 +46,13 @@ sealed class GamepadElement {
         val label: String?,
         val trigger: KeyTrigger,
         val binding: InputBinding,
-        @Serializable(with = UUIDAsStringSerializer::class)
-        override val id: UUID
     ) : GamepadElement()
 
     @Serializable
     @SerialName("Joystick")
     data class Joystick(
+        @Serializable(with = UUIDAsStringSerializer::class)
+        override val id: UUID,
         override val positionX: Double,
         override val positionY: Double,
         override val scale: Double,
@@ -59,13 +61,13 @@ sealed class GamepadElement {
         val down: InputBinding,
         val left: InputBinding,
         val right: InputBinding,
-        @Serializable(with = UUIDAsStringSerializer::class)
-        override val id: UUID
     ) : GamepadElement()
 
     @Serializable
     @SerialName("AnalogJoystick")
     data class AnalogJoystick(
+        @Serializable(with = UUIDAsStringSerializer::class)
+        override val id: UUID,
         override val positionX: Double,
         override val positionY: Double,
         override val scale: Double,
@@ -73,7 +75,5 @@ sealed class GamepadElement {
         val stick: GamepadStick,
         /** Which controller slot (0-based) this stick feeds. The on-screen pad is player 1 by default. */
         val device: Int = 0,
-        @Serializable(with = UUIDAsStringSerializer::class)
-        override val id: UUID
     ) : GamepadElement()
 }
