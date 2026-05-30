@@ -60,7 +60,7 @@ class LayoutLibrary private constructor(
                         GamepadElement.Key(positionX = 0.66, positionY = 0.78, scale = 0.22, opacity = 1.0, label = null, trigger = KeyTrigger.Press, binding = InputBinding.Keyboard(GmlKey.C.code), id = UUID.randomUUID()),
                         GamepadElement.Key(positionX = 0.79, positionY = 0.78, scale = 0.22, opacity = 1.0, label = null, trigger = KeyTrigger.Press, binding = InputBinding.Keyboard(GmlKey.X.code), id = UUID.randomUUID()),
                         GamepadElement.Key(positionX = 0.92, positionY = 0.78, scale = 0.22, opacity = 1.0, label = null, trigger = KeyTrigger.Press, binding = InputBinding.Keyboard(GmlKey.Z.code), id = UUID.randomUUID()),
-                        GamepadElement.Menu(positionX = 0.30, positionY = 0.30, scale = 0.22, opacity = 1.0, id = UUID.randomUUID()),
+                        GamepadElement.Menu(positionX = 0.94, positionY = 0.10, scale = 0.14, opacity = 1.0, id = UUID.randomUUID()),
                     )
                 ),
                 GamepadLayout(
@@ -78,9 +78,10 @@ class LayoutLibrary private constructor(
                             right = InputBinding.Keyboard(GmlKey.RIGHT.code),
                             id = UUID.randomUUID()
                         ),
-                        GamepadElement.Key(positionX = 0.82, positionY = 0.66, scale = 0.20, opacity = 1.0, label = null, trigger = KeyTrigger.Press, binding = InputBinding.Keyboard(GmlKey.C.code), id = UUID.randomUUID()),
-                        GamepadElement.Key(positionX = 0.82, positionY = 0.80, scale = 0.20, opacity = 1.0, label = null, trigger = KeyTrigger.Press, binding = InputBinding.Keyboard(GmlKey.X.code), id = UUID.randomUUID()),
-                        GamepadElement.Key(positionX = 0.82, positionY = 0.94, scale = 0.20, opacity = 1.0, label = null, trigger = KeyTrigger.Press, binding = InputBinding.Keyboard(GmlKey.Z.code), id = UUID.randomUUID()),
+                        GamepadElement.Key(positionX = 0.82, positionY = 0.56, scale = 0.20, opacity = 1.0, label = null, trigger = KeyTrigger.Press, binding = InputBinding.Keyboard(GmlKey.C.code), id = UUID.randomUUID()),
+                        GamepadElement.Key(positionX = 0.82, positionY = 0.70, scale = 0.20, opacity = 1.0, label = null, trigger = KeyTrigger.Press, binding = InputBinding.Keyboard(GmlKey.X.code), id = UUID.randomUUID()),
+                        GamepadElement.Key(positionX = 0.82, positionY = 0.84, scale = 0.20, opacity = 1.0, label = null, trigger = KeyTrigger.Press, binding = InputBinding.Keyboard(GmlKey.Z.code), id = UUID.randomUUID()),
+                        GamepadElement.Menu(positionX = 0.92, positionY = 0.95, scale = 0.14, opacity = 1.0, id = UUID.randomUUID()),
                     )
                 )
             )
