@@ -320,7 +320,6 @@ class GameActivity : ComponentActivity() {
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .weight(1f)
-                                        .safeDrawingPadding()
                                 )
                             }
                         }

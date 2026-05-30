@@ -182,8 +182,7 @@ fun BoxWithConstraintsScope.GamepadEditor(
 
     Column(
         modifier = Modifier
-            .align(Alignment.TopCenter)
-            .padding(top = 16.dp),
+            .align(Alignment.TopCenter),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
