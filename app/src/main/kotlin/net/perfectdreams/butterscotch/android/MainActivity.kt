@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -46,7 +46,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             ButterscotchAndroidTheme {
-                var splashGone by remember { mutableStateOf(false) }
+                var splashGone by rememberSaveable { mutableStateOf(false) }
                 Box(Modifier.fillMaxSize()) {
                     ButterscotchApp(gameLibrary, layoutLibrary)
                     if (!splashGone) {
