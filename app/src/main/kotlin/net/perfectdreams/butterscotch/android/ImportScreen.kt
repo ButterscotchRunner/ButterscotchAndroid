@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import kotlinx.coroutines.Dispatchers
@@ -164,6 +165,7 @@ private fun IntroPane(onSelectFolder: () -> Unit, onSelectZip: () -> Unit) {
         Text(
             "Select a folder or a ZIP with a GameMaker WAD file (${GameImporter.WAD_FILENAMES.joinToString(", ")})",
             style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(24.dp))
         Button(onClick = onSelectFolder) {
