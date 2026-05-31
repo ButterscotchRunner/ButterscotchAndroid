@@ -36,6 +36,9 @@ fun ButterscotchApp(gameLibrary: GameLibrary, layoutLibrary: LayoutLibrary) {
         composable<Route.About> {
             AboutScreen(nav = nav)
         }
+        composable<Route.Licenses> {
+            LicensesScreen(nav = nav)
+        }
         composable<Route.GameSettings> { backStackEntry ->
             val args = backStackEntry.toRoute<Route.GameSettings>()
             SettingsScreen(

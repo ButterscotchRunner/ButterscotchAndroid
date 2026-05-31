@@ -17,8 +17,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -87,6 +89,11 @@ fun AboutScreen(nav: NavHostController) {
             Spacer(Modifier.height(8.dp))
             contributors.forEach { name ->
                 Text(name, style = MaterialTheme.typography.bodyMedium)
+            }
+
+            Spacer(Modifier.height(24.dp))
+            OutlinedButton(onClick = { nav.navigate(Route.Licenses) }) {
+                Text("Open-Source Licenses")
             }
         }
     }
