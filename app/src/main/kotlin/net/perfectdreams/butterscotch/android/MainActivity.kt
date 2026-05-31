@@ -31,7 +31,7 @@ class MainActivity : ComponentActivity() {
 
                 if (gameLibrary.findById(gameId) != null) {
                     startActivity(Intent(this, GameActivity::class.java).apply {
-                        putExtra(GameActivity.EXTRA_GAME_ID, gameId)
+                        putExtra(GameActivity.EXTRA_GAME_ID, gameId.toString())
                     })
                     finish()
                 }
@@ -45,6 +45,7 @@ class MainActivity : ComponentActivity() {
         splashScreen.setKeepOnScreenCondition { !splashReady }
         window.decorView.postDelayed({ splashReady = true }, 350)
 
+        splashScreen.
         // Tier 1 cut-out: collapse the cream splash into a shrinking circle, revealing the app underneath
         splashScreen.setOnExitAnimationListener { provider ->
             val splashView = provider.view
