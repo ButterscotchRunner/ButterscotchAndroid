@@ -2,6 +2,7 @@ package net.perfectdreams.butterscotch.android
 
 import android.content.Context
 import android.net.Uri
+import android.provider.OpenableColumns
 import android.util.Log
 import androidx.documentfile.provider.DocumentFile
 import kotlinx.coroutines.Dispatchers
@@ -10,6 +11,7 @@ import net.perfectdreams.butterscotch.android.library.GameLibrary
 import net.perfectdreams.butterscotch.android.pe.IconCandidate
 import net.perfectdreams.butterscotch.android.pe.scanIconCandidates
 import java.io.File
+import java.util.zip.ZipInputStream
 
 /**
  * Copies a user-picked folder (via Storage Access Framework tree Uri) into the app's per-game
@@ -96,12 +98,76 @@ object GameImporter {
             return@withContext Result.Failure("Couldn't copy folder: ${e.message}")
         }
 
+        finalize(library, staged, wadFilename, folderName)
+    }
+
+    /**
+     * Pick a ZIP → extract it into a fresh staging dir → peek the WAD metadata. Runs on IO
+     * dispatcher.
+     *
+     * Unlike folder import, the WAD may live anywhere inside the archive (e.g. the user zipped the
+     * whole game folder, producing `MyGame/data.win`). We extract everything to a temp dir, find the
+     * first known WAD filename recursively, and promote the directory that holds it to be the bundle
+     * root — so the WAD's sibling assets (icons, audio, the original .exe) come along.
+     */
+    suspend fun importZip(
+        context: Context,
+        zipUri: Uri,
+        library: GameLibrary,
+    ): Result = withContext(Dispatchers.IO) {
+        val displayName = queryDisplayName(context, zipUri)
+        val fallbackName = (displayName?.removeSuffix(".zip") ?: "").ifBlank { "Imported Game" }
+        val staged = library.beginStaging()
+
+        // Extract into a sibling temp dir first so we can locate the WAD wherever it is, then move
+        // its containing directory into the bundle.
+        val temp = File(staged.bundleDir.parentFile, "extract-tmp")
+        if (temp.exists()) temp.deleteRecursively()
+        temp.mkdirs()
+
+        try {
+            extractZip(context, zipUri, temp)
+        } catch (e: Exception) {
+            Log.e(TAG, "Zip extraction failed for $zipUri", e)
+            temp.deleteRecursively()
+            library.discardStaging(staged)
+            return@withContext Result.Failure("Couldn't extract ZIP: ${e.message}")
+        }
+
+        val wadFile = temp.walkTopDown().firstOrNull { it.isFile && it.name in WAD_FILENAMES }
+        if (wadFile == null) {
+            temp.deleteRecursively()
+            library.discardStaging(staged)
+            return@withContext Result.MissingWad(fallbackName)
+        }
+
+        // The directory holding the WAD becomes the bundle root; copy its contents into the bundle.
+        val wadRoot = wadFile.parentFile ?: temp
+        for (child in wadRoot.listFiles() ?: emptyArray()) {
+            child.copyRecursively(File(staged.bundleDir, child.name), overwrite = true)
+        }
+        temp.deleteRecursively()
+
+        finalize(library, staged, wadFile.name, fallbackName)
+    }
+
+    /**
+     * Shared tail for both import paths: verify the WAD landed in the bundle, peek its GEN8
+     * metadata, scan for icon candidates, and build the [Result.Success]. On the (bug) case where
+     * the WAD is missing after copy, discards the staging dir and returns [Result.Failure].
+     */
+    private fun finalize(
+        library: GameLibrary,
+        staged: GameLibrary.StagedGame,
+        wadFilename: String,
+        fallbackName: String,
+    ): Result {
         val wadFile = File(staged.bundleDir, wadFilename)
         if (!wadFile.exists()) {
-            // Shouldn't happen — we just confirmed the WAD doc existed and copyTree didn't throw.
+            // Shouldn't happen — we just confirmed the WAD existed and the copy didn't throw.
             // But if it does, fail loud rather than letting the native parser explode.
             library.discardStaging(staged)
-            return@withContext Result.Failure("WAD vanished after copy (this is a bug).")
+            return Result.Failure("WAD vanished after copy (this is a bug).")
         }
 
         // Peek metadata. parseLight may exit() on a corrupt WAD — accepted (see memory).
@@ -114,12 +180,12 @@ object GameImporter {
             .onFailure { Log.w(TAG, "Icon extraction failed for ${staged.id}", it) }
             .getOrDefault(emptyList())
 
-        Result.Success(
+        return Result.Success(
             staged = staged,
             wadFilename = wadFilename,
             suggestedTitle = suggestedTitle,
             wadVersion = wadVersion,
-            folderName = folderName,
+            folderName = fallbackName,
             iconCandidates = iconCandidates,
         )
     }
@@ -141,6 +207,44 @@ object GameImporter {
                     target.outputStream().use { output -> input.copyTo(output) }
                 } ?: error("Could not open child $name for reading")
             }
+        }
+    }
+
+    /**
+     * Extract a user-picked zip into [dest]. Mirrors the zip-slip guard and separator normalization
+     * from [SaveSlotZip.importZipIntoSlot] — entries with `..` in their path are refused so a
+     * malicious archive can't escape [dest].
+     */
+    private fun extractZip(context: Context, source: Uri, dest: File) {
+        val input = context.contentResolver.openInputStream(source)
+            ?: error("Could not open input stream for $source")
+        input.use { ins ->
+            ZipInputStream(ins.buffered()).use { zip ->
+                while (true) {
+                    val entry = zip.nextEntry ?: break
+                    val safeName = entry.name.replace('\\', '/')
+                    if (safeName.contains("..")) {
+                        // Defend against zip slip — refuse entries that would escape the dest dir.
+                        zip.closeEntry()
+                        continue
+                    }
+                    val target = File(dest, safeName)
+                    if (entry.isDirectory) {
+                        target.mkdirs()
+                    } else {
+                        target.parentFile?.mkdirs()
+                        target.outputStream().use { out -> zip.copyTo(out) }
+                    }
+                    zip.closeEntry()
+                }
+            }
+        }
+    }
+
+    /** Resolve a content Uri's display name (the file name) for use as a fallback title. */
+    private fun queryDisplayName(context: Context, uri: Uri): String? {
+        return context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) cursor.getString(0) else null
         }
     }
 }

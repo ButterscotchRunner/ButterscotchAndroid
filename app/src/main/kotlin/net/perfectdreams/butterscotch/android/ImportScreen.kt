@@ -83,6 +83,23 @@ fun ImportScreen(
         }
     }
 
+    val pickZip = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri == null) {
+            // User cancelled the picker — stay on Intro.
+            return@rememberLauncherForActivityResult
+        }
+        state = ImportUIState.Copying
+        scope.launch {
+            state = when (val result = GameImporter.importZip(context, uri, library)) {
+                is GameImporter.Result.Success -> ImportUIState.Configure(result)
+                is GameImporter.Result.MissingWad -> ImportUIState.Error(
+                    "Missing WAD in ZIP!\n\nExpected one of: ${GameImporter.WAD_FILENAMES.joinToString(", ")}"
+                )
+                is GameImporter.Result.Failure -> ImportUIState.Error(result.message)
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             ButterscotchTopBar(
@@ -108,7 +125,10 @@ fun ImportScreen(
     ) { innerPadding ->
         Box(Modifier.fillMaxSize().padding(innerPadding).padding(24.dp)) {
             when (val s = state) {
-                ImportUIState.Intro -> IntroPane(onSelect = { pickFolder.launch(null) })
+                ImportUIState.Intro -> IntroPane(
+                    onSelectFolder = { pickFolder.launch(null) },
+                    onSelectZip = { pickZip.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) },
+                )
                 ImportUIState.Copying -> CopyingPane()
                 is ImportUIState.Configure -> ConfigurePane(
                     result = s.result,
@@ -135,19 +155,23 @@ fun ImportScreen(
 }
 
 @Composable
-private fun IntroPane(onSelect: () -> Unit) {
+private fun IntroPane(onSelectFolder: () -> Unit, onSelectZip: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            "Select a folder with a GameMaker WAD file (data.win, game.unx, game.osx, game.droid, game.ios, game.psp, etc.)",
+            "Select a folder or a ZIP with a GameMaker WAD file (data.win, game.unx, game.osx, game.droid, game.ios, game.psp, etc.)",
             style = MaterialTheme.typography.bodyLarge,
         )
         Spacer(Modifier.height(24.dp))
-        Button(onClick = onSelect) {
-            Text("Select folder")
+        Button(onClick = onSelectFolder) {
+            Text("Import folder")
+        }
+        Spacer(Modifier.height(12.dp))
+        Button(onClick = onSelectZip) {
+            Text("Import ZIP")
         }
     }
 }
