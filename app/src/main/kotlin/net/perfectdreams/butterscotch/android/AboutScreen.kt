@@ -56,8 +56,8 @@ fun AboutScreen(nav: NavHostController) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(24.dp)
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(rememberScrollState())
+                .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             val transition = rememberInfiniteTransition(label = "logoBob")
