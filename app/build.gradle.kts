@@ -31,8 +31,8 @@ android {
         applicationId = "net.perfectdreams.butterscotch"
         minSdk = 24
         targetSdk = 36
-        versionCode = 2
-        versionName = "2026.05.1"
+        versionCode = 3
+        versionName = "2026.05.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -161,6 +161,7 @@ dependencies {
     implementation(libs.androidx.documentfile)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.billing.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
     testImplementation(libs.junit)
