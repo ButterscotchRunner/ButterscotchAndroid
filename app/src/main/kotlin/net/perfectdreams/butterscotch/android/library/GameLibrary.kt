@@ -120,6 +120,8 @@ class GameLibrary private constructor(
             enablePhysicalKeyboard = enablePhysicalKeyboard,
         )
         entries.add(entry)
+        // Sync order after adding a new entry
+        syncOrder()
 
         if (icon != null) {
             runCatching {
