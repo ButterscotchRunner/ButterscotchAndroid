@@ -69,7 +69,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             signingConfig = if (keystorePropertiesFile.exists()) signingConfigs.getByName("release") else null
             // Upload native symbol tables so Play Console can symbolicate crashes inside the Butterscotch runtime
             ndk {

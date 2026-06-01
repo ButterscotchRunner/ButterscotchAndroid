@@ -19,3 +19,16 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# JNI boundary: Keep ButterscotchNative
+-keep class net.perfectdreams.butterscotch.android.ButterscotchNative { *; }
+
+# kotlinx-serialization: keep the generated $serializer classes and the serializer() accessors
+-keepattributes RuntimeVisibleAnnotations,AnnotationDefault
+-keepclassmembers class net.perfectdreams.butterscotch.android.** {
+    *** Companion;
+}
+-keepclasseswithmembers class net.perfectdreams.butterscotch.android.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+-keep,includedescriptorclasses class net.perfectdreams.butterscotch.android.**$$serializer { *; }
