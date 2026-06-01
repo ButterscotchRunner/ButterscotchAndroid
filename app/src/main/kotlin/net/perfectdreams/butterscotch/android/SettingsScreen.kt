@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.AddToHomeScreen
-import androidx.compose.material.icons.filled.AddToHomeScreen
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Save
@@ -36,6 +35,8 @@ import androidx.navigation.NavHostController
 import net.perfectdreams.butterscotch.android.components.ButterscotchBackButton
 import net.perfectdreams.butterscotch.android.components.ButterscotchTopBar
 import net.perfectdreams.butterscotch.android.library.GameLibrary
+import net.perfectdreams.butterscotch.android.billing.BillingManager
+import net.perfectdreams.butterscotch.android.components.ProBadge
 import net.perfectdreams.butterscotch.android.shortcuts.requestPinGameShortcut
 import java.util.UUID
 
@@ -58,6 +59,7 @@ fun SettingsScreen(
     val entry = library.findById(gameId) ?: return
 
     val context = LocalContext.current
+    val billing = remember { BillingManager.getInstance(context) }
     val pinShortcutsSupported = remember { ShortcutManagerCompat.isRequestPinShortcutSupported(context) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -91,7 +93,10 @@ fun SettingsScreen(
                         icon = Icons.AutoMirrored.Default.AddToHomeScreen,
                         title = "Add Shortcut to Home Screen",
                         subtitle = "Pin a launcher icon for this game",
-                        onClick = { requestPinGameShortcut(context, library, entry) },
+                        trailing = if (billing.isPro) null else ({ ProBadge() }),
+                        onClick = {
+                            if (billing.isPro) requestPinGameShortcut(context, library, entry) else nav.navigate(Route.Pro)
+                        },
                     )
                 }
             }
@@ -132,6 +137,7 @@ private fun SettingsRow(
     title: String,
     subtitle: String? = null,
     titleColor: Color = Color.Unspecified,
+    trailing: @Composable (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     Row(
@@ -144,11 +150,15 @@ private fun SettingsRow(
             tint = if (titleColor == Color.Unspecified) MaterialTheme.colorScheme.primary else titleColor,
         )
         Spacer(Modifier.padding(end = 16.dp))
-        Column(Modifier.padding(start = 16.dp)) {
+        Column(Modifier.padding(start = 16.dp).weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleMedium, color = titleColor)
             if (subtitle != null) {
                 Text(subtitle, style = MaterialTheme.typography.bodyMedium)
             }
+        }
+        if (trailing != null) {
+            Spacer(Modifier.padding(end = 16.dp))
+            trailing()
         }
     }
     HorizontalDivider()

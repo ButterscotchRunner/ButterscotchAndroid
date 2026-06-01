@@ -1,6 +1,7 @@
 package net.perfectdreams.butterscotch.android
 
 import android.content.Context
+import net.perfectdreams.butterscotch.android.billing.BillingManager
 import net.perfectdreams.butterscotch.android.layouts.LayoutLibrary
 import net.perfectdreams.butterscotch.android.library.GameLibrary
 

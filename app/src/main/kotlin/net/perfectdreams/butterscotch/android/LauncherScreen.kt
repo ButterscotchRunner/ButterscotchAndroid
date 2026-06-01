@@ -97,6 +97,15 @@ fun LauncherScreen(
                         )
 
                         DropdownMenuItem(
+                            leadingIcon = { Icon(Icons.Filled.Star, contentDescription = null) },
+                            text = { Text("Butterscotch Pro") },
+                            onClick = {
+                                menuExpanded = false
+                                nav.navigate(Route.Pro)
+                            },
+                        )
+
+                        DropdownMenuItem(
                             leadingIcon = { Icon(Icons.Filled.Info, contentDescription = null) },
                             text = { Text("About") },
                             onClick = {

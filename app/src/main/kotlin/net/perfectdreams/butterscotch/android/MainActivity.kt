@@ -2,6 +2,7 @@ package net.perfectdreams.butterscotch.android
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -13,6 +14,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import net.perfectdreams.butterscotch.android.billing.BillingManager
 import net.perfectdreams.butterscotch.android.theme.ButterscotchAndroidTheme
 import java.util.UUID
 
@@ -24,21 +26,28 @@ class MainActivity : ComponentActivity() {
         val gameLibrary = Libraries.loadGameLibrary(this.applicationContext)
         val layoutLibrary = Libraries.loadLayoutLibrary(this.applicationContext)
 
+        val billing = BillingManager.getInstance(this.applicationContext)
+        billing.connect()
+
         if (intent?.action == ACTION_LAUNCH_GAME) {
             val gameIdAsString = intent.getStringExtra(GameActivity.EXTRA_GAME_ID)
             // Clear so a config change / recreate doesn't re-trigger the forward.
             intent.action = null
             intent.removeExtra(GameActivity.EXTRA_GAME_ID)
             if (gameIdAsString != null) {
-                val gameId = UUID.fromString(gameIdAsString)
+                if (billing.isPro) {
+                    val gameId = UUID.fromString(gameIdAsString)
 
-                if (gameLibrary.findById(gameId) != null) {
-                    startActivity(Intent(this, GameActivity::class.java).apply {
-                        putExtra(GameActivity.EXTRA_GAME_ID, gameId.toString())
-                    })
-                    finish()
+                    if (gameLibrary.findById(gameId) != null) {
+                        startActivity(Intent(this, GameActivity::class.java).apply {
+                            putExtra(GameActivity.EXTRA_GAME_ID, gameId.toString())
+                        })
+                        finish()
+                    }
+                    return
                 }
-                return
+
+                Toast.makeText(this.applicationContext, "You don't have Pro to use shortcuts!", Toast.LENGTH_LONG).show()
             }
             // Unknown/stale id: fall through to the normal launcher UI.
         }
