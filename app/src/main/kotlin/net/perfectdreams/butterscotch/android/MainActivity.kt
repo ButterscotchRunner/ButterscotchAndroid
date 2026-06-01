@@ -14,6 +14,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import com.google.android.gms.ads.MobileAds
 import net.perfectdreams.butterscotch.android.billing.BillingManager
 import net.perfectdreams.butterscotch.android.theme.ButterscotchAndroidTheme
 import java.util.UUID
@@ -28,6 +29,11 @@ class MainActivity : ComponentActivity() {
 
         val billing = BillingManager.getInstance(this.applicationContext)
         billing.connect()
+
+        // Pro users never see ads, so there's no reason to spin up the AdMob SDK for them
+        if (!billing.isPro) {
+            MobileAds.initialize(this.applicationContext)
+        }
 
         if (intent?.action == ACTION_LAUNCH_GAME) {
             val gameIdAsString = intent.getStringExtra(GameActivity.EXTRA_GAME_ID)

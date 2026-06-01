@@ -18,7 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Info
@@ -52,6 +52,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.navigation.NavHostController
+import net.perfectdreams.butterscotch.android.billing.BillingManager
+import net.perfectdreams.butterscotch.android.components.BannerAd
 import net.perfectdreams.butterscotch.android.components.ButterscotchTopBar
 import net.perfectdreams.butterscotch.android.library.GameEntry
 import net.perfectdreams.butterscotch.android.library.GameLibrary
@@ -71,6 +73,7 @@ fun LauncherScreen(
     nav: NavHostController
 ) {
     val context = LocalContext.current
+    val billing = remember { BillingManager.getInstance(context) }
     var menuExpanded by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -150,19 +153,25 @@ fun LauncherScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 // The entries are already sorted here
-                items(entries, key = { it.id.toString() }) { entry ->
-                    GameTile(
-                        library = library,
-                        entry = entry,
-                        onLaunch = {
-                            context.startActivity(Intent(context, GameActivity::class.java).apply {
-                                putExtra(GameActivity.EXTRA_GAME_ID, entry.id.toString())
-                            })
-                        },
-                        onOpenSettings = {
-                            nav.navigate(Route.GameSettings(entry.id.toString()))
-                        },
-                    )
+                itemsIndexed(entries, key = { _, entry -> entry.id.toString() }) { index, entry ->
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (!billing.isPro && index % 6 == 0) {
+                            BannerAd()
+                        }
+
+                        GameTile(
+                            library = library,
+                            entry = entry,
+                            onLaunch = {
+                                context.startActivity(Intent(context, GameActivity::class.java).apply {
+                                    putExtra(GameActivity.EXTRA_GAME_ID, entry.id.toString())
+                                })
+                            },
+                            onOpenSettings = {
+                                nav.navigate(Route.GameSettings(entry.id.toString()))
+                            },
+                        )
+                    }
                 }
             }
         }

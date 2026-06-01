@@ -74,7 +74,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             signingConfig = if (keystorePropertiesFile.exists()) signingConfigs.getByName("release") else null
-            
+
             // Upload native symbol tables so Play Console can symbolicate crashes inside the Butterscotch runtime
             ndk {
                 debugSymbolLevel = "SYMBOL_TABLE"
@@ -171,6 +171,7 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.billing.ktx)
+    implementation(libs.play.services.ads)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
     testImplementation(libs.junit)
