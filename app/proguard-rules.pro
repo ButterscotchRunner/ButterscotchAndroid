@@ -32,3 +32,8 @@
     kotlinx.serialization.KSerializer serializer(...);
 }
 -keep,includedescriptorclasses class net.perfectdreams.butterscotch.android.**$$serializer { *; }
+
+# Required for AdMob for SOME REASON
+-keepclassmembers class * extends androidx.room.RoomDatabase {
+    <init>();
+}
