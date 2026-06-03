@@ -12,9 +12,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun ProBadge(modifier: Modifier = Modifier) {
+fun PlusBadge(modifier: Modifier = Modifier) {
     Text(
-        "PRO",
+        "PLUS",
         style = MaterialTheme.typography.labelSmall,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.onPrimary,
