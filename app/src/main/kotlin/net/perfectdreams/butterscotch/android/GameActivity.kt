@@ -41,6 +41,7 @@ import net.perfectdreams.butterscotch.android.components.MenuOverlay
 import net.perfectdreams.butterscotch.android.layouts.GamepadElement
 import net.perfectdreams.butterscotch.android.layouts.LayoutLibrary
 import net.perfectdreams.butterscotch.android.library.GameLibrary
+import net.perfectdreams.butterscotch.android.theme.ButterscotchAndroidTheme
 import java.util.UUID
 
 /**
@@ -109,235 +110,263 @@ class GameActivity : ComponentActivity() {
         this.butterscotchRunner = butterscotchRunner
 
         setContent {
-            // VirtualKeyState lives here (not inside the gamepad) so we can release-all on layout
-            // changes that reflow the gamepad's Composable tree. If it lived inside GameControls
-            // and Compose discarded that subtree across an orientation flip, held keys could "leak"
-            // into the runner with no Composable left to release them.
-            val keys = remember { VirtualKeyState(butterscotchRunner) }
+            ButterscotchAndroidTheme {
+                // VirtualKeyState lives here (not inside the gamepad) so we can release-all on layout
+                // changes that reflow the gamepad's Composable tree. If it lived inside GameControls
+                // and Compose discarded that subtree across an orientation flip, held keys could "leak"
+                // into the runner with no Composable left to release them.
+                val keys = remember { VirtualKeyState(butterscotchRunner) }
 
-            var menuOpen by remember { mutableStateOf(false) }
-            var editMode by remember { mutableStateOf(false) }
-            var fastForwardActiveButtonId by remember { mutableStateOf<UUID?>(null) }
+                var menuOpen by remember { mutableStateOf(false) }
+                var editMode by remember { mutableStateOf(false) }
+                var fastForwardActiveButtonId by remember { mutableStateOf<UUID?>(null) }
 
-            val isPaused = editMode || menuOpen
+                val isPaused = editMode || menuOpen
 
-            LaunchedEffect(isPaused) {
-                if (!isPaused) {
-                    // When we stop being paused, we release all keys
-                    keys.releaseAll()
-                }
-
-                butterscotchRunner.paused.value = isPaused
-                // We also reset the fast forward speed to avoid a fast forward button being deleted while it is still active
-                fastForwardActiveButtonId = null
-            }
-
-            // Toggling edit mode drops any held keys so a press in flight does not stick.
-            LaunchedEffect(editMode) { keys.releaseAll() }
-
-            // Auto-finish when the native runner reports it has exited (game quit, fatal error).
-            val hasExited = ButterscotchNative.hasExited
-            LaunchedEffect(hasExited) {
-                if (hasExited)
-                    finish()
-            }
-
-            val targetOperatingSystemDisplaySize: IntSize? = entry.runnerOs.displayResolution
-
-            // movableContentOf wraps the SurfaceView so re-parenting it between Overlay/Stacked
-            // layouts doesn't destroy and recreate the View. The SurfaceView's underlying Android
-            // Surface MAY still be recreated by the system (and that's fine — the native side
-            // handles surfaceDestroyed/Created), but keeping the View instance means we don't
-            // re-attach the SurfaceHolder.Callback every time and the transition is cheaper.
-            val gameSurface = remember {
-                movableContentOf<Modifier> { modifier ->
-                    AndroidView(
-                        modifier = modifier,
-                        factory = { ctx ->
-                            SurfaceView(ctx).apply {
-                                // setFixedSize requests the buffer resolution, the compositor scales it to the View.
-                                if (targetOperatingSystemDisplaySize != null) {
-                                    holder.setFixedSize(targetOperatingSystemDisplaySize.width, targetOperatingSystemDisplaySize.height)
-                                }
-
-                                holder.addCallback(object : SurfaceHolder.Callback {
-                                    override fun surfaceCreated(holder: SurfaceHolder) {
-                                        butterscotchRunner.startRenderLoop(holder.surface)
-                                    }
-
-                                    override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
-                                        butterscotchRunner.onSurfaceResized(width, height)
-                                    }
-
-                                    override fun surfaceDestroyed(holder: SurfaceHolder) {
-                                        butterscotchRunner.stopRenderLoop()
-                                    }
-                                })
-                            }
-                        }
-                    )
-                }
-            }
-
-            Box(
-                Modifier
-                    .background(Color.Black)
-                    .fillMaxSize()
-            ) {
-                BoxWithConstraints(Modifier.fillMaxSize()) {
-                    val gameSize = ButterscotchNative.currentGameSize
-
-                    val contentAspect = if (targetOperatingSystemDisplaySize != null) {
-                        targetOperatingSystemDisplaySize.width.toFloat() / targetOperatingSystemDisplaySize.height.toFloat()
-                    } else if (gameSize != null && gameSize.height > 0) {
-                        gameSize.width.toFloat() / gameSize.height.toFloat()
-                    } else {
-                        4f / 3f
-                    }
-                    val deviceAspect = constraints.maxWidth.toFloat() / constraints.maxHeight.toFloat()
-                    val layoutMode = pickLayoutMode(contentAspect, deviceAspect)
-
-                    LaunchedEffect(layoutMode) {
+                LaunchedEffect(isPaused) {
+                    if (!isPaused) {
+                        // When we stop being paused, we release all keys
                         keys.releaseAll()
                     }
 
-                    val isPortrait = constraints.maxHeight >= constraints.maxWidth
+                    butterscotchRunner.paused.value = isPaused
+                    // We also reset the fast forward speed to avoid a fast forward button being deleted while it is still active
+                    fastForwardActiveButtonId = null
+                }
 
-                    val liveEntry = requireNotNull(gameLibrary.findById(gameId))
+                // Toggling edit mode drops any held keys so a press in flight does not stick.
+                LaunchedEffect(editMode) { keys.releaseAll() }
 
-                    // Resolve this game's assigned layout for the current orientation, falling back to the built-in default if the id is missing.
-                    // Keyed on (isPortrait, assignedId) so it  re-resolves on rotation AND when the assignment changes (after Save As).
-                    // An Overlay/Stacked reflow changes neither, so in-progress edits survive it.
-                    val assignedId = if (isPortrait) liveEntry.portraitLayout else liveEntry.landscapeLayout
-                    val fallbackId = if (isPortrait) LayoutLibrary.DEFAULT_PORTRAIT_LAYOUT else LayoutLibrary.DEFAULT_LANDSCAPE_LAYOUT
+                // Auto-finish when the native runner reports it has exited (game quit, fatal error).
+                val hasExited = ButterscotchNative.hasExited
+                LaunchedEffect(hasExited) {
+                    if (hasExited)
+                        finish()
+                }
 
-                    Log.i(TAG, "Using $assignedId for the gamepad layout... The fallback ID is $fallbackId")
+                val targetOperatingSystemDisplaySize: IntSize? = entry.runnerOs.displayResolution
 
-                    var layout by remember(isPortrait, assignedId) { mutableStateOf(layoutLibrary.findById(assignedId) ?: layoutLibrary.findById(fallbackId)!!) }
+                // movableContentOf wraps the SurfaceView so re-parenting it between Overlay/Stacked
+                // layouts doesn't destroy and recreate the View. The SurfaceView's underlying Android
+                // Surface MAY still be recreated by the system (and that's fine — the native side
+                // handles surfaceDestroyed/Created), but keeping the View instance means we don't
+                // re-attach the SurfaceHolder.Callback every time and the transition is cheaper.
+                val gameSurface = remember {
+                    movableContentOf<Modifier> { modifier ->
+                        AndroidView(
+                            modifier = modifier,
+                            factory = { ctx ->
+                                SurfaceView(ctx).apply {
+                                    // setFixedSize requests the buffer resolution, the compositor scales it to the View.
+                                    if (targetOperatingSystemDisplaySize != null) {
+                                        holder.setFixedSize(
+                                            targetOperatingSystemDisplaySize.width,
+                                            targetOperatingSystemDisplaySize.height
+                                        )
+                                    }
 
+                                    holder.addCallback(object : SurfaceHolder.Callback {
+                                        override fun surfaceCreated(holder: SurfaceHolder) {
+                                            butterscotchRunner.startRenderLoop(holder.surface)
+                                        }
 
-                    // Save only applies to user layouts; the built-in defaults are read-only.
-                    val canSave = layout.id != LayoutLibrary.DEFAULT_PORTRAIT_LAYOUT && layout.id != LayoutLibrary.DEFAULT_LANDSCAPE_LAYOUT
-                    val onSave = { layoutLibrary.upsert(layout) }
-                    val onSaveAs = { name: String ->
-                        // Fork to a fresh id with the given name, persist it, and point this game's
-                        // orientation-specific layout at the copy so it loads next time. Keep editing it.
-                        val forked = layout.copy(id = UUID.randomUUID(), fancyName = name)
-                        layoutLibrary.upsert(forked)
-                        gameLibrary.update(entry.id) { e ->
-                            if (isPortrait) e.copy(portraitLayout = forked.id) else e.copy(landscapeLayout = forked.id)
-                        }
-                        layout = forked
-                    }
-                    val onFastForwardPress = { it: GamepadElement.FastForward ->
-                        if (it.toggle && fastForwardActiveButtonId == it.id) {
-                            fastForwardActiveButtonId = null
-                        } else {
-                            fastForwardActiveButtonId = it.id
-                        }
-                    }
-                    val onFastForwardRelease = { it: GamepadElement.FastForward ->
-                        if (fastForwardActiveButtonId == it.id)
-                            fastForwardActiveButtonId = null
-                    }
+                                        override fun surfaceChanged(
+                                            holder: SurfaceHolder,
+                                            format: Int,
+                                            width: Int,
+                                            height: Int
+                                        ) {
+                                            butterscotchRunner.onSurfaceResized(width, height)
+                                        }
 
-                    // We need to have this here because we NEED the current element
-                    LaunchedEffect(fastForwardActiveButtonId) {
-                        if (fastForwardActiveButtonId == null) {
-                            butterscotchRunner.fastForwardSpeed = 1.0f
-                        } else {
-                            val element = layout.elements.firstOrNull { it.id == fastForwardActiveButtonId } as GamepadElement.FastForward?
-
-                            if (element != null) {
-                                butterscotchRunner.fastForwardSpeed = element.speed
-                            } else {
-                                // I doubt this can happen because we do set it to null when the menu is open/paused, but...
-                                fastForwardActiveButtonId = null
-                            }
-                        }
-                    }
-
-                    when (layoutMode) {
-                        LayoutMode.Overlay -> {
-                            Box(Modifier.fillMaxSize()) {
-                                val gameSurfaceModifier = if (targetOperatingSystemDisplaySize != null) {
-                                    (if (deviceAspect > contentAspect) Modifier.fillMaxHeight() else Modifier.fillMaxWidth())
-                                        .aspectRatio(contentAspect)
-                                        .align(Alignment.Center)
-                                } else {
-                                    Modifier.fillMaxSize()
+                                        override fun surfaceDestroyed(holder: SurfaceHolder) {
+                                            butterscotchRunner.stopRenderLoop()
+                                        }
+                                    })
                                 }
-                                gameSurface(gameSurfaceModifier)
-                                GameControls(
-                                    layout = layout,
-                                    editMode = editMode,
-                                    activeFastForwardButtonId = fastForwardActiveButtonId,
-                                    onLayoutChange = { layout = it },
-                                    onExitEditMode = { editMode = false },
-                                    canSave = canSave,
-                                    onSave = onSave,
-                                    onSaveAs = onSaveAs,
-                                    onMenuOpen = {
-                                        menuOpen = true
-                                    },
-                                    onFastForwardPress = onFastForwardPress,
-                                    onFastForwardRelease = onFastForwardRelease,
-                                    keys = keys,
-                                    modifier = Modifier.fillMaxSize()
-                                )
                             }
-                        }
-                        LayoutMode.Stacked -> {
-                            Column(Modifier.fillMaxSize()) {
-                                Box(
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .weight(1f),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    gameSurface(
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .aspectRatio(contentAspect)
-                                    )
-                                }
-
-                                GameControls(
-                                    layout = layout,
-                                    editMode = editMode,
-                                    activeFastForwardButtonId = fastForwardActiveButtonId,
-                                    onLayoutChange = { layout = it },
-                                    onExitEditMode = { editMode = false },
-                                    canSave = canSave,
-                                    onSave = onSave,
-                                    onSaveAs = onSaveAs,
-                                    onMenuOpen = {
-                                        menuOpen = true
-                                    },
-                                    onFastForwardPress = onFastForwardPress,
-                                    onFastForwardRelease = onFastForwardRelease,
-                                    keys = keys,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .weight(1f)
-                                )
-                            }
-                        }
+                        )
                     }
                 }
 
-                MenuOverlay(
-                    butterscotchRunner,
-                    menuOpen,
-                    onMenuToggle = {
-                        menuOpen = it
-                    },
-                    onExitGame = {
-                        // This is blocking
-                        butterscotchRunner.requestExit()
-                    },
-                    onEditLayout = { editMode = true },
-                )
+                Box(
+                    Modifier
+                        .background(Color.Black)
+                        .fillMaxSize()
+                ) {
+                    BoxWithConstraints(Modifier.fillMaxSize()) {
+                        val gameSize = ButterscotchNative.currentGameSize
+
+                        val contentAspect = if (targetOperatingSystemDisplaySize != null) {
+                            targetOperatingSystemDisplaySize.width.toFloat() / targetOperatingSystemDisplaySize.height.toFloat()
+                        } else if (gameSize != null && gameSize.height > 0) {
+                            gameSize.width.toFloat() / gameSize.height.toFloat()
+                        } else {
+                            4f / 3f
+                        }
+                        val deviceAspect =
+                            constraints.maxWidth.toFloat() / constraints.maxHeight.toFloat()
+                        val layoutMode = pickLayoutMode(contentAspect, deviceAspect)
+
+                        LaunchedEffect(layoutMode) {
+                            keys.releaseAll()
+                        }
+
+                        val isPortrait = constraints.maxHeight >= constraints.maxWidth
+
+                        val liveEntry = requireNotNull(gameLibrary.findById(gameId))
+
+                        // Resolve this game's assigned layout for the current orientation, falling back to the built-in default if the id is missing.
+                        // Keyed on (isPortrait, assignedId) so it  re-resolves on rotation AND when the assignment changes (after Save As).
+                        // An Overlay/Stacked reflow changes neither, so in-progress edits survive it.
+                        val assignedId =
+                            if (isPortrait) liveEntry.portraitLayout else liveEntry.landscapeLayout
+                        val fallbackId =
+                            if (isPortrait) LayoutLibrary.DEFAULT_PORTRAIT_LAYOUT else LayoutLibrary.DEFAULT_LANDSCAPE_LAYOUT
+
+                        Log.i(
+                            TAG,
+                            "Using $assignedId for the gamepad layout... The fallback ID is $fallbackId"
+                        )
+
+                        var layout by remember(isPortrait, assignedId) {
+                            mutableStateOf(
+                                layoutLibrary.findById(assignedId) ?: layoutLibrary.findById(
+                                    fallbackId
+                                )!!
+                            )
+                        }
+
+
+                        // Save only applies to user layouts; the built-in defaults are read-only.
+                        val canSave =
+                            layout.id != LayoutLibrary.DEFAULT_PORTRAIT_LAYOUT && layout.id != LayoutLibrary.DEFAULT_LANDSCAPE_LAYOUT
+                        val onSave = { layoutLibrary.upsert(layout) }
+                        val onSaveAs = { name: String ->
+                            // Fork to a fresh id with the given name, persist it, and point this game's
+                            // orientation-specific layout at the copy so it loads next time. Keep editing it.
+                            val forked = layout.copy(id = UUID.randomUUID(), fancyName = name)
+                            layoutLibrary.upsert(forked)
+                            gameLibrary.update(entry.id) { e ->
+                                if (isPortrait) e.copy(portraitLayout = forked.id) else e.copy(
+                                    landscapeLayout = forked.id
+                                )
+                            }
+                            layout = forked
+                        }
+                        val onFastForwardPress = { it: GamepadElement.FastForward ->
+                            if (it.toggle && fastForwardActiveButtonId == it.id) {
+                                fastForwardActiveButtonId = null
+                            } else {
+                                fastForwardActiveButtonId = it.id
+                            }
+                        }
+                        val onFastForwardRelease = { it: GamepadElement.FastForward ->
+                            if (fastForwardActiveButtonId == it.id)
+                                fastForwardActiveButtonId = null
+                        }
+
+                        // We need to have this here because we NEED the current element
+                        LaunchedEffect(fastForwardActiveButtonId) {
+                            if (fastForwardActiveButtonId == null) {
+                                butterscotchRunner.fastForwardSpeed = 1.0f
+                            } else {
+                                val element =
+                                    layout.elements.firstOrNull { it.id == fastForwardActiveButtonId } as GamepadElement.FastForward?
+
+                                if (element != null) {
+                                    butterscotchRunner.fastForwardSpeed = element.speed
+                                } else {
+                                    // I doubt this can happen because we do set it to null when the menu is open/paused, but...
+                                    fastForwardActiveButtonId = null
+                                }
+                            }
+                        }
+
+                        when (layoutMode) {
+                            LayoutMode.Overlay -> {
+                                Box(Modifier.fillMaxSize()) {
+                                    val gameSurfaceModifier =
+                                        if (targetOperatingSystemDisplaySize != null) {
+                                            (if (deviceAspect > contentAspect) Modifier.fillMaxHeight() else Modifier.fillMaxWidth())
+                                                .aspectRatio(contentAspect)
+                                                .align(Alignment.Center)
+                                        } else {
+                                            Modifier.fillMaxSize()
+                                        }
+                                    gameSurface(gameSurfaceModifier)
+                                    GameControls(
+                                        layout = layout,
+                                        editMode = editMode,
+                                        activeFastForwardButtonId = fastForwardActiveButtonId,
+                                        onLayoutChange = { layout = it },
+                                        onExitEditMode = { editMode = false },
+                                        canSave = canSave,
+                                        onSave = onSave,
+                                        onSaveAs = onSaveAs,
+                                        onMenuOpen = {
+                                            menuOpen = true
+                                        },
+                                        onFastForwardPress = onFastForwardPress,
+                                        onFastForwardRelease = onFastForwardRelease,
+                                        keys = keys,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+                            }
+
+                            LayoutMode.Stacked -> {
+                                Column(Modifier.fillMaxSize()) {
+                                    Box(
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .weight(1f),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        gameSurface(
+                                            Modifier
+                                                .fillMaxWidth()
+                                                .aspectRatio(contentAspect)
+                                        )
+                                    }
+
+                                    GameControls(
+                                        layout = layout,
+                                        editMode = editMode,
+                                        activeFastForwardButtonId = fastForwardActiveButtonId,
+                                        onLayoutChange = { layout = it },
+                                        onExitEditMode = { editMode = false },
+                                        canSave = canSave,
+                                        onSave = onSave,
+                                        onSaveAs = onSaveAs,
+                                        onMenuOpen = {
+                                            menuOpen = true
+                                        },
+                                        onFastForwardPress = onFastForwardPress,
+                                        onFastForwardRelease = onFastForwardRelease,
+                                        keys = keys,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .weight(1f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    MenuOverlay(
+                        butterscotchRunner,
+                        menuOpen,
+                        onMenuToggle = {
+                            menuOpen = it
+                        },
+                        onExitGame = {
+                            // This is blocking
+                            butterscotchRunner.requestExit()
+                        },
+                        onEditLayout = { editMode = true },
+                    )
+                }
             }
         }
     }
