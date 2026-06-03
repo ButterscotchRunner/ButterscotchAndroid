@@ -18,17 +18,21 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -298,27 +302,21 @@ private fun BoxScope.MenuSidebar(
                         modifier = Modifier.fillMaxWidth(),
                     )
 
-                    LazyColumn {
-                        items(rooms) { item ->
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                                    .clickable {
-                                        ButterscotchNative.gotoRoom(item.index)
-                                        isRoomWarpMenuOpen = false
-                                        onDismiss()
-                                    }) {
-                                Text(
-                                    text = item.name,
-                                    style = MaterialTheme.typography.bodyLarge
-                                )
+                    HorizontalDivider()
 
-                                Text(
-                                    text = "Room #${item.index}",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
+                    LazyColumn(modifier = Modifier.heightIn(max = 320.dp)) {
+                        itemsIndexed(rooms, key = { _, item -> item.index }) { index, item ->
+                            ListItem(
+                                headlineContent = { Text(item.name) },
+                                supportingContent = { Text("Room #${item.index}") },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                modifier = Modifier.clickable {
+                                    ButterscotchNative.gotoRoom(item.index)
+                                    isRoomWarpMenuOpen = false
+                                    onDismiss()
+                                }
+                            )
+                            if (rooms.lastIndex > index) HorizontalDivider()
                         }
                     }
                 }
