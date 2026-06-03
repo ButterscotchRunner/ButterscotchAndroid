@@ -137,6 +137,14 @@ object ButterscotchNative {
     external fun gotoRoom(roomIndex: Int)
     external fun setWidescreenHackAspectRatio(aspectRatio: Float)
 
+    /**
+     * Set the visual-only free camera (photo mode). [panX]/[panY] are fractions of the (zoomed) view,
+     * [zoom] is a magnification multiplier (1.0 = identity, > 1.0 = zoom in). Render thread only, same
+     * threading rules as the other render-side externals. This only affects the projection matrix, so
+     * game logic, collisions and camera-follow are untouched.
+     */
+    external fun setFreeCamera(panX: Float, panY: Float, zoom: Float)
+
     // ===[ Native -> Kotlin push state ]===
 
     var currentTitle: String? by mutableStateOf(null)

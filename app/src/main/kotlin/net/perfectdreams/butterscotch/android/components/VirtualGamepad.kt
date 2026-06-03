@@ -223,6 +223,7 @@ fun MenuOverlay(
     onMenuToggle: (Boolean) -> Unit,
     onExitGame: () -> Unit,
     onEditLayout: () -> Unit,
+    onEnableFreeCam: () -> Unit,
     portraitLayouts: List<GamepadLayout>,
     landscapeLayouts: List<GamepadLayout>,
     selectedPortraitLayoutId: UUID,
@@ -248,6 +249,7 @@ fun MenuOverlay(
             onDismiss = { onMenuToggle.invoke(false) },
             onExitGame = onExitGame,
             onEditLayout = onEditLayout,
+            onEnableFreeCam = onEnableFreeCam,
             portraitLayouts = portraitLayouts,
             landscapeLayouts = landscapeLayouts,
             selectedPortraitLayoutId = selectedPortraitLayoutId,
@@ -278,6 +280,7 @@ private fun BoxScope.MenuSidebar(
     onDismiss: () -> Unit,
     onExitGame: () -> Unit,
     onEditLayout: () -> Unit,
+    onEnableFreeCam: () -> Unit,
     portraitLayouts: List<GamepadLayout>,
     landscapeLayouts: List<GamepadLayout>,
     selectedPortraitLayoutId: UUID,
@@ -477,6 +480,11 @@ private fun BoxScope.MenuSidebar(
 
                 MenuItem(label = "Warp to Room", onClick = {
                     isRoomWarpMenuOpen = true
+                })
+
+                MenuItem(label = "Free Cam", onClick = {
+                    onDismiss()
+                    onEnableFreeCam()
                 })
             }
         }

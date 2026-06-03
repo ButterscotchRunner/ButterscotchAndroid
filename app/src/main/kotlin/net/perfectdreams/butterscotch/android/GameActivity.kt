@@ -26,17 +26,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.flow.update
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.viewinterop.AndroidView
+import net.perfectdreams.butterscotch.android.components.FreeCameraOverlay
 import net.perfectdreams.butterscotch.android.components.GameControls
 import net.perfectdreams.butterscotch.android.components.MenuOverlay
 import net.perfectdreams.butterscotch.android.layouts.GamepadElement
@@ -128,6 +131,9 @@ class GameActivity : ComponentActivity() {
 
                 var menuOpen by remember { mutableStateOf(false) }
                 var editMode by remember { mutableStateOf(false) }
+                // Free cam state lives on the runner (single source of truth, read on the render thread);
+                // we observe it here so the UI reacts to it.
+                val freeCam by butterscotchRunner.freeCamera.collectAsState()
                 var fastForwardActiveButtonId by remember { mutableStateOf<UUID?>(null) }
                 // Hoisted so the in-game Settings switch reflects (and persists) the live runner flag.
                 var widescreenHackEnabled by remember { mutableStateOf(entry.enableWidescreenHack) }
@@ -299,32 +305,36 @@ class GameActivity : ComponentActivity() {
                         when (layoutMode) {
                             LayoutMode.Overlay -> {
                                 Box(Modifier.fillMaxSize()) {
-                                    val gameSurfaceModifier =
-                                        if (targetOperatingSystemDisplaySize != null) {
-                                            (if (deviceAspect > contentAspect) Modifier.fillMaxHeight() else Modifier.fillMaxWidth())
-                                                .aspectRatio(contentAspect)
-                                                .align(Alignment.Center)
-                                        } else {
-                                            Modifier.fillMaxSize()
-                                        }
+                                    val gameSurfaceModifier = if (freeCam.active) {
+                                        // Fill the whole screen!
+                                        Modifier.fillMaxSize()
+                                    } else if (targetOperatingSystemDisplaySize != null) {
+                                        (if (deviceAspect > contentAspect) Modifier.fillMaxHeight() else Modifier.fillMaxWidth())
+                                            .aspectRatio(contentAspect)
+                                            .align(Alignment.Center)
+                                    } else {
+                                        Modifier.fillMaxSize()
+                                    }
                                     gameSurface(gameSurfaceModifier)
-                                    GameControls(
-                                        layout = layout,
-                                        editMode = editMode,
-                                        activeFastForwardButtonId = fastForwardActiveButtonId,
-                                        onLayoutChange = { layout = it },
-                                        onExitEditMode = { editMode = false },
-                                        canSave = canSave,
-                                        onSave = onSave,
-                                        onSaveAs = onSaveAs,
-                                        onMenuOpen = {
-                                            menuOpen = true
-                                        },
-                                        onFastForwardPress = onFastForwardPress,
-                                        onFastForwardRelease = onFastForwardRelease,
-                                        keys = keys,
-                                        modifier = Modifier.fillMaxSize()
-                                    )
+                                    if (!freeCam.active) {
+                                        GameControls(
+                                            layout = layout,
+                                            editMode = editMode,
+                                            activeFastForwardButtonId = fastForwardActiveButtonId,
+                                            onLayoutChange = { layout = it },
+                                            onExitEditMode = { editMode = false },
+                                            canSave = canSave,
+                                            onSave = onSave,
+                                            onSaveAs = onSaveAs,
+                                            onMenuOpen = {
+                                                menuOpen = true
+                                            },
+                                            onFastForwardPress = onFastForwardPress,
+                                            onFastForwardRelease = onFastForwardRelease,
+                                            keys = keys,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    }
                                 }
                             }
 
@@ -336,32 +346,38 @@ class GameActivity : ComponentActivity() {
                                             .weight(1f),
                                         contentAlignment = Alignment.Center
                                     ) {
+                                        // Fill the whole screen!
                                         gameSurface(
-                                            Modifier
-                                                .fillMaxWidth()
-                                                .aspectRatio(contentAspect)
+                                            if (freeCam.active)
+                                                Modifier.fillMaxSize()
+                                            else
+                                                Modifier
+                                                    .fillMaxWidth()
+                                                    .aspectRatio(contentAspect)
                                         )
                                     }
 
-                                    GameControls(
-                                        layout = layout,
-                                        editMode = editMode,
-                                        activeFastForwardButtonId = fastForwardActiveButtonId,
-                                        onLayoutChange = { layout = it },
-                                        onExitEditMode = { editMode = false },
-                                        canSave = canSave,
-                                        onSave = onSave,
-                                        onSaveAs = onSaveAs,
-                                        onMenuOpen = {
-                                            menuOpen = true
-                                        },
-                                        onFastForwardPress = onFastForwardPress,
-                                        onFastForwardRelease = onFastForwardRelease,
-                                        keys = keys,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .weight(1f)
-                                    )
+                                    if (!freeCam.active) {
+                                        GameControls(
+                                            layout = layout,
+                                            editMode = editMode,
+                                            activeFastForwardButtonId = fastForwardActiveButtonId,
+                                            onLayoutChange = { layout = it },
+                                            onExitEditMode = { editMode = false },
+                                            canSave = canSave,
+                                            onSave = onSave,
+                                            onSaveAs = onSaveAs,
+                                            onMenuOpen = {
+                                                menuOpen = true
+                                            },
+                                            onFastForwardPress = onFastForwardPress,
+                                            onFastForwardRelease = onFastForwardRelease,
+                                            keys = keys,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .weight(1f)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -376,6 +392,9 @@ class GameActivity : ComponentActivity() {
                                 butterscotchRunner.requestExit()
                             },
                             onEditLayout = { editMode = true },
+                            onEnableFreeCam = {
+                                butterscotchRunner.freeCamera.update { it.copy(active = true) }
+                            },
                             // Settings exposes both orientations at once, so each picker only lists layouts for its own orientation
                             portraitLayouts = layoutLibrary.entries.filter { it.orientation == GamepadLayout.GamepadTargetOrientation.PORTRAIT },
                             landscapeLayouts = layoutLibrary.entries.filter { it.orientation == GamepadLayout.GamepadTargetOrientation.LANDSCAPE },
@@ -397,6 +416,15 @@ class GameActivity : ComponentActivity() {
                                 gameLibrary.update(entry.id) { it.copy(enableWidescreenHack = enabled) }
                             },
                         )
+
+                        // We want this to be on top of the menu
+                        if (freeCam.active) {
+                            FreeCameraOverlay(
+                                onCameraChange = { px, py, z -> butterscotchRunner.freeCamera.update { it.copy(panX = px, panY = py, zoom = z) } },
+                                // Reset everything (pan/zoom + active) to identity in one atomic assignment.
+                                onClose = { butterscotchRunner.freeCamera.value = ButterscotchDroidRunner.FreeCameraState() }
+                            )
+                        }
                     }
                 }
             }

@@ -39,6 +39,14 @@ class ButterscotchDroidRunner(val dataWinPath: String, val savesPath: String, va
     val keyboardRouter = KeyboardRouter(this)
     var fastForwardSpeed = 1.0f
     var surfaceSize = IntSize.Zero
+    val freeCamera = MutableStateFlow(FreeCameraState())
+
+    data class FreeCameraState(
+        val active: Boolean = false,
+        val panX: Float = 0.0f,
+        val panY: Float = 0.0f,
+        val zoom: Float = 1.0f
+    )
 
     /**
      * Forward a SurfaceHolder size change to the EGL layer so the next frame renders at the right resolution.
@@ -83,11 +91,15 @@ class ButterscotchDroidRunner(val dataWinPath: String, val savesPath: String, va
                         lastFrameStartNs = System.nanoTime()
                     }
 
-                    if (this@ButterscotchDroidRunner.enableWidescreenHack && this@ButterscotchDroidRunner.surfaceSize.width != 0 && this@ButterscotchDroidRunner.surfaceSize.height != 0) {
+                    val freeCam = this@ButterscotchDroidRunner.freeCamera.value
+
+                    if ((this@ButterscotchDroidRunner.enableWidescreenHack || freeCam.active) && this@ButterscotchDroidRunner.surfaceSize.width != 0 && this@ButterscotchDroidRunner.surfaceSize.height != 0) {
                         ButterscotchNative.setWidescreenHackAspectRatio(this@ButterscotchDroidRunner.surfaceSize.width / this@ButterscotchDroidRunner.surfaceSize.height.toFloat())
                     } else {
                         ButterscotchNative.setWidescreenHackAspectRatio(0.0f)
                     }
+
+                    ButterscotchNative.setFreeCamera(freeCam.panX, freeCam.panY, freeCam.zoom)
 
                     val frameStartNs = System.nanoTime()
                     val deltaTimeSeconds = ((frameStartNs - lastFrameStartNs) / 1_000_000_000.0).toFloat()
