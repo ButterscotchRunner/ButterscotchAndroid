@@ -22,7 +22,9 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -301,7 +303,7 @@ private fun BoxScope.MenuSidebar(
             // it here registers this Composable as an observer; any title change recomposes us
             // automatically, even if the menu is currently open.
             val title = ButterscotchNative.currentTitle ?: "Butterscotch"
-            Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
+            Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
                 Text(
                     text = title,
                     color = Color.White,
