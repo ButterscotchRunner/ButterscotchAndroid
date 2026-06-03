@@ -22,11 +22,21 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -38,6 +48,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.DialogProperties
 import net.perfectdreams.butterscotch.android.ButterscotchDroidRunner
 import net.perfectdreams.butterscotch.android.ButterscotchNative
 import net.perfectdreams.butterscotch.android.VirtualKeyState
@@ -244,6 +255,81 @@ private fun BoxScope.MenuSidebar(
     onExitGame: () -> Unit,
     onEditLayout: () -> Unit
 ) {
+    var isRoomWarpMenuOpen by remember { mutableStateOf(false) }
+
+    if (isRoomWarpMenuOpen) {
+        var roomNameFilter by remember { mutableStateOf("") }
+
+        data class RoomEntry(
+            val index: Int,
+            val name: String
+        )
+
+        val rooms = mutableListOf<RoomEntry>()
+        val roomCount = ButterscotchNative.getRoomCount()
+
+        repeat(roomCount) { roomIndex ->
+            val name = ButterscotchNative.getRoomName(roomIndex)
+
+            if (roomNameFilter.isBlank() || name.contains(roomNameFilter, true) || name.toIntOrNull() == roomIndex) {
+                rooms.add(
+                    RoomEntry(
+                        roomIndex,
+                        name
+                    )
+                )
+            }
+        }
+
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("Select a Room") },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+            text = {
+                Column {
+                    Text("ATTENTION! Warping to a room may BREAK THE GAME!")
+
+                    OutlinedTextField(
+                        value = roomNameFilter,
+                        onValueChange = { roomNameFilter = it },
+                        label = { Text("Filter") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    LazyColumn {
+                        items(rooms) { item ->
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                                    .clickable {
+                                        ButterscotchNative.gotoRoom(item.index)
+                                        isRoomWarpMenuOpen = false
+                                        onDismiss()
+                                    }) {
+                                Text(
+                                    text = item.name,
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+
+                                Text(
+                                    text = "Room #${item.index}",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    isRoomWarpMenuOpen = false
+                }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     // Scrim - separate AnimatedVisibility so it can fade independently of the panel slide.
     // matchParentSize so the fade-in container covers the full screen while it's animating.
     AnimatedVisibility(
@@ -303,7 +389,10 @@ private fun BoxScope.MenuSidebar(
             // it here registers this Composable as an observer; any title change recomposes us
             // automatically, even if the menu is currently open.
             val title = ButterscotchNative.currentTitle ?: "Butterscotch"
-            Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
+            Column(modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp)) {
                 Text(
                     text = title,
                     color = Color.White,
@@ -313,6 +402,10 @@ private fun BoxScope.MenuSidebar(
                 MenuItem(label = "Edit Layout", onClick = {
                     onDismiss()
                     onEditLayout()
+                })
+
+                MenuItem(label = "Warp to Room", onClick = {
+                    isRoomWarpMenuOpen = true
                 })
 
                 MenuItem(label = "Exit", onClick = {

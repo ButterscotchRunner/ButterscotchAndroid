@@ -132,6 +132,10 @@ object ButterscotchNative {
     /** Tear down runner/renderer/audio. */
     external fun stopRunner()
 
+    external fun getRoomCount(): Int
+    external fun getRoomName(roomIndex: Int): String
+    external fun gotoRoom(roomIndex: Int)
+
     // ===[ Native -> Kotlin push state ]===
 
     var currentTitle: String? by mutableStateOf(null)
