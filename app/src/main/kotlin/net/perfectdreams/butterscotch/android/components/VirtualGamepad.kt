@@ -28,6 +28,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -399,18 +400,37 @@ private fun BoxScope.MenuSidebar(
                     style = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold),
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
+
+                MenuItem(label = "Exit", onClick = {
+                    onDismiss()
+                    onExitGame()
+                })
+
+                HorizontalDivider()
+
+                Text(
+                    text = "Virtual Gamepad",
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    modifier = Modifier.padding(top = 20.dp, bottom = 8.dp),
+                )
+
                 MenuItem(label = "Edit Layout", onClick = {
                     onDismiss()
                     onEditLayout()
                 })
 
+                Text(
+                    text = "Cheats",
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    modifier = Modifier.padding(top = 20.dp, bottom = 8.dp),
+                )
+
                 MenuItem(label = "Warp to Room", onClick = {
                     isRoomWarpMenuOpen = true
-                })
-
-                MenuItem(label = "Exit", onClick = {
-                    onDismiss()
-                    onExitGame()
                 })
             }
         }
