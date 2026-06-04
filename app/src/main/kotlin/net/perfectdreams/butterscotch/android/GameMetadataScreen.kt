@@ -56,6 +56,7 @@ fun GameMetadataScreen(
     val runnerOsChanged = state.runnerOs != entry.runnerOs
     val controllersChanged = state.enablePhysicalControllers != entry.enablePhysicalControllers
     val keyboardChanged = state.enablePhysicalKeyboard != entry.enablePhysicalKeyboard
+    val widescreenHackChanged = state.enableWidescreenHack != entry.enableWidescreenHack
 
     Scaffold(
         topBar = {
@@ -67,7 +68,7 @@ fun GameMetadataScreen(
                 layoutLibrary = layoutLibrary,
                 state = state,
                 loadCandidates = { scanIconCandidates(gameLibrary.bundleDir(entry)) },
-                saveEnabled = titleChanged || iconChanged || layoutsChanged || runnerOsChanged || controllersChanged || keyboardChanged,
+                saveEnabled = titleChanged || iconChanged || layoutsChanged || runnerOsChanged || controllersChanged || keyboardChanged || widescreenHackChanged,
                 onSave = {
                     if (titleChanged) gameLibrary.setTitle(entry.id, state.titleTrimmed)
                     if (iconChanged) gameLibrary.setIcon(entry.id, state.selectedIcon)
@@ -75,6 +76,7 @@ fun GameMetadataScreen(
                     if (runnerOsChanged) gameLibrary.update(entry.id) { it.copy(runnerOs = state.runnerOs) }
                     if (controllersChanged) gameLibrary.update(entry.id) { it.copy(enablePhysicalControllers = state.enablePhysicalControllers) }
                     if (keyboardChanged) gameLibrary.update(entry.id) { it.copy(enablePhysicalKeyboard = state.enablePhysicalKeyboard) }
+                    if (widescreenHackChanged) gameLibrary.update(entry.id) { it.copy(enableWidescreenHack = state.enableWidescreenHack) }
                     nav.popBackStack()
                 },
             )
