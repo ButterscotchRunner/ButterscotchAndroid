@@ -348,7 +348,7 @@ class GameActivity : ComponentActivity() {
                                     ) {
                                         // Fill the whole screen!
                                         gameSurface(
-                                            if (freeCam.active)
+                                            if (freeCam.active || widescreenHackEnabled)
                                                 Modifier.fillMaxSize()
                                             else
                                                 Modifier
