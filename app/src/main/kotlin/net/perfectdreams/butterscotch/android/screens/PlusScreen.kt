@@ -1,4 +1,4 @@
-package net.perfectdreams.butterscotch.android
+package net.perfectdreams.butterscotch.android.screens
 
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.core.EaseInOut
@@ -43,6 +43,7 @@ import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import net.perfectdreams.butterscotch.android.R
 import net.perfectdreams.butterscotch.android.billing.BillingManager
 import net.perfectdreams.butterscotch.android.components.ButterscotchBackButton
 import net.perfectdreams.butterscotch.android.components.ButterscotchTopBar

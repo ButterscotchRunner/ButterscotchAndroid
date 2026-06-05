@@ -1,7 +1,8 @@
-package net.perfectdreams.butterscotch.android
+package net.perfectdreams.butterscotch.android.screens
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.widget.Toast
 import androidx.core.graphics.drawable.toBitmap
@@ -28,6 +29,7 @@ import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -51,6 +53,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.navigation.NavHostController
+import net.perfectdreams.butterscotch.android.GameActivity
+import net.perfectdreams.butterscotch.android.R
+import net.perfectdreams.butterscotch.android.Route
 import net.perfectdreams.butterscotch.android.billing.BillingManager
 import net.perfectdreams.butterscotch.android.components.BannerAd
 import net.perfectdreams.butterscotch.android.components.ButterscotchTopBar
@@ -58,14 +63,14 @@ import net.perfectdreams.butterscotch.android.library.GameEntry
 import net.perfectdreams.butterscotch.android.library.GameLibrary
 
 /**
- * The library list. Receives a [net.perfectdreams.butterscotch.android.library.GameLibrary] from [ButterscotchApp] — because its `entries` field
+ * The library list. Receives a [GameLibrary] from [net.perfectdreams.butterscotch.android.ButterscotchApp] — because its `entries` field
  * is a Compose snapshot list, mutations from [ImportScreen]/[SettingsScreen] reflect here
  * automatically without any lifecycle-based reload.
  *
  * Navigation is delegated upward via the three lambdas so this screen stays unaware of the nav
  * graph / Intent plumbing.
  */
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LauncherScreen(
     library: GameLibrary,
@@ -163,7 +168,7 @@ fun LauncherScreen(
                             entry = entry,
                             onLaunch = {
                                 context.startActivity(Intent(context, GameActivity::class.java).apply {
-                                    putExtra(GameActivity.EXTRA_GAME_ID, entry.id.toString())
+                                    putExtra(GameActivity.Companion.EXTRA_GAME_ID, entry.id.toString())
                                 })
                             },
                             onOpenSettings = {
@@ -272,7 +277,7 @@ private fun GameIcon(
  * because on API 26+ that resolves to an `<adaptive-icon>` XML, which Compose's painterResource
  * refuses to load.
  */
-private fun appIconBitmap(context: Context): android.graphics.Bitmap {
+private fun appIconBitmap(context: Context): Bitmap {
     val drawable = context.packageManager.getApplicationIcon(context.packageName)
     return drawable.toBitmap()
 }

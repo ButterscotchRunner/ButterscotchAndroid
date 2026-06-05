@@ -9,6 +9,15 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import net.perfectdreams.butterscotch.android.layouts.LayoutLibrary
 import net.perfectdreams.butterscotch.android.library.GameLibrary
+import net.perfectdreams.butterscotch.android.screens.AboutScreen
+import net.perfectdreams.butterscotch.android.screens.GameMetadataScreen
+import net.perfectdreams.butterscotch.android.screens.ImportScreen
+import net.perfectdreams.butterscotch.android.screens.LauncherScreen
+import net.perfectdreams.butterscotch.android.screens.LicensesScreen
+import net.perfectdreams.butterscotch.android.screens.PlusScreen
+import net.perfectdreams.butterscotch.android.screens.SaveSlotDetailScreen
+import net.perfectdreams.butterscotch.android.screens.SaveSlotListScreen
+import net.perfectdreams.butterscotch.android.screens.SettingsScreen
 import java.util.UUID
 
 /**
