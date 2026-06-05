@@ -136,6 +136,7 @@ object ButterscotchNative {
     external fun getRoomName(roomIndex: Int): String
     external fun gotoRoom(roomIndex: Int)
     external fun setWidescreenHackAspectRatio(aspectRatio: Float)
+    external fun setNormalizedCursorPosition(x: Float, y: Float)
 
     /**
      * Set the visual-only free camera (photo mode). [panX]/[panY] are fractions of the (zoomed) view,

@@ -17,6 +17,8 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -36,6 +38,7 @@ import kotlinx.coroutines.flow.update
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.viewinterop.AndroidView
@@ -175,6 +178,18 @@ class GameActivity : ComponentActivity() {
                         AndroidView(
                             modifier = modifier.onSizeChanged {
                                 butterscotchRunner.setGameSurfaceSize(it)
+                            }.pointerInput(Unit) {
+                                awaitPointerEventScope {
+                                    while (true) {
+                                        val event = awaitPointerEvent()
+                                        val position = event.changes.first().position
+
+                                        val fractionX = position.x / size.width
+                                        val fractionY = position.y / size.height
+
+                                        ButterscotchNative.setNormalizedCursorPosition(fractionX, fractionY)
+                                    }
+                                }
                             },
                             factory = { ctx ->
                                 SurfaceView(ctx).apply {
