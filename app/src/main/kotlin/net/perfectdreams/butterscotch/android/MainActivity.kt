@@ -26,6 +26,7 @@ class MainActivity : ComponentActivity() {
 
         val gameLibrary = Libraries.loadGameLibrary(this.applicationContext)
         val layoutLibrary = Libraries.loadLayoutLibrary(this.applicationContext)
+        val settingsStore = Libraries.loadSettingsStore(this.applicationContext)
 
         val billing = BillingManager.getInstance(this.applicationContext)
         billing.connect()
@@ -63,7 +64,7 @@ class MainActivity : ComponentActivity() {
             ButterscotchAndroidTheme {
                 var splashGone by rememberSaveable { mutableStateOf(false) }
                 Box(Modifier.fillMaxSize()) {
-                    ButterscotchApp(gameLibrary, layoutLibrary)
+                    ButterscotchApp(gameLibrary, layoutLibrary, settingsStore)
                     if (!splashGone) {
                         SplashReveal(onFinished = { splashGone = true })
                     }

@@ -9,6 +9,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import net.perfectdreams.butterscotch.android.layouts.LayoutLibrary
 import net.perfectdreams.butterscotch.android.library.GameLibrary
+import net.perfectdreams.butterscotch.android.settings.SettingsStore
 import net.perfectdreams.butterscotch.android.screens.AboutScreen
 import net.perfectdreams.butterscotch.android.screens.GameMetadataScreen
 import net.perfectdreams.butterscotch.android.screens.GeneralSettingsScreen
@@ -25,7 +26,7 @@ import java.util.UUID
  * The entry point of the app!
  */
 @Composable
-fun ButterscotchApp(gameLibrary: GameLibrary, layoutLibrary: LayoutLibrary) {
+fun ButterscotchApp(gameLibrary: GameLibrary, layoutLibrary: LayoutLibrary, settingsStore: SettingsStore) {
     val nav = rememberNavController()
 
     NavHost(
@@ -53,7 +54,7 @@ fun ButterscotchApp(gameLibrary: GameLibrary, layoutLibrary: LayoutLibrary) {
             LicensesScreen(nav = nav)
         }
         composable<Route.GeneralSettings> {
-            GeneralSettingsScreen(gameLibrary = gameLibrary, layoutLibrary = layoutLibrary, nav = nav)
+            GeneralSettingsScreen(gameLibrary = gameLibrary, layoutLibrary = layoutLibrary, settingsStore = settingsStore, nav = nav)
         }
         composable<Route.GameSettings> { backStackEntry ->
             val args = backStackEntry.toRoute<Route.GameSettings>()

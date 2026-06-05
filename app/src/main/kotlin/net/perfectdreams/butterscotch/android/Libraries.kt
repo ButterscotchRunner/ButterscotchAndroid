@@ -4,6 +4,7 @@ import android.content.Context
 import net.perfectdreams.butterscotch.android.billing.BillingManager
 import net.perfectdreams.butterscotch.android.layouts.LayoutLibrary
 import net.perfectdreams.butterscotch.android.library.GameLibrary
+import net.perfectdreams.butterscotch.android.settings.SettingsStore
 
 object Libraries {
     fun loadGameLibrary(context: Context): GameLibrary {
@@ -12,5 +13,9 @@ object Libraries {
 
     fun loadLayoutLibrary(context: Context): LayoutLibrary {
         return LayoutLibrary.load(context)
+    }
+
+    fun loadSettingsStore(context: Context): SettingsStore {
+        return SettingsStore.load(context)
     }
 }
