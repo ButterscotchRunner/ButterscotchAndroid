@@ -1,19 +1,29 @@
 package net.perfectdreams.butterscotch.android.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.VideogameAsset
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import net.perfectdreams.butterscotch.android.Route
 import net.perfectdreams.butterscotch.android.components.ButterscotchBackButton
 import net.perfectdreams.butterscotch.android.components.ButterscotchTopBar
 import net.perfectdreams.butterscotch.android.components.InputToggle
@@ -58,6 +68,18 @@ fun GeneralSettingsScreen(
                         // 10..100 in steps of 10 = 10 stops, which is 8 ticks between the endpoints
                         steps = 8,
                     )
+                }
+
+                Row(
+                    Modifier.fillMaxWidth().clickable { nav.navigate(Route.LayoutManager) }.padding(vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Filled.VideogameAsset, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.padding(end = 16.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Gamepad Layouts", style = MaterialTheme.typography.titleMedium)
+                        Text("Rename, duplicate, or delete on-screen control layouts", style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
             }
         }

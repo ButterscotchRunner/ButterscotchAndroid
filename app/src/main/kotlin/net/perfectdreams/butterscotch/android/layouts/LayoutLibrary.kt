@@ -102,12 +102,21 @@ class LayoutLibrary private constructor(
         save()
     }
 
+    // True for the two built-in layouts, which are re-seeded on every load and can't be edited or deleted
+    fun isBuiltIn(id: UUID): Boolean = id == DEFAULT_PORTRAIT_LAYOUT || id == DEFAULT_LANDSCAPE_LAYOUT
+
+    // Deletes a user layout. Built-in defaults are re-seeded on every load, so they can't be removed.
+    // Games still pointing at the deleted id fall back to the matching default at launch (see GameActivity)
+    fun remove(id: UUID) {
+        require(!isBuiltIn(id)) { "Cannot delete a built-in layout" }
+        entries.removeAll { it.id == id }
+        save()
+    }
+
     // Built-in defaults are re-seeded on every load, so we never write them out - that keeps them
     // upgradeable and out of layouts.json. Only user layouts are persisted.
     private fun save() {
-        val persistable = entries.filter {
-            it.id != DEFAULT_PORTRAIT_LAYOUT && it.id != DEFAULT_LANDSCAPE_LAYOUT
-        }
+        val persistable = entries.filter { !isBuiltIn(it.id) }
         try {
             indexFile.writeText(json.encodeToString(persistable), Charsets.UTF_8)
         } catch (e: Exception) {

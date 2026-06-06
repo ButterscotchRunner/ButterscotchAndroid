@@ -446,7 +446,7 @@ class GameActivity : ComponentActivity() {
                         val currentEditorState = editorState
                         if (currentEditorState != null) {
                             // Save only applies to user layouts; the built-in defaults are read-only.
-                            val canSave = layout.id != LayoutLibrary.DEFAULT_PORTRAIT_LAYOUT && layout.id != LayoutLibrary.DEFAULT_LANDSCAPE_LAYOUT
+                            val canSave = !layoutLibrary.isBuiltIn(layout.id)
                             val onSave = {
                                 layoutLibrary.upsert(currentEditorState.layout)
                                 layout = currentEditorState.layout
