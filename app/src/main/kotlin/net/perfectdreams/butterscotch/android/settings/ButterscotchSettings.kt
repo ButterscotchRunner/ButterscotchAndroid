@@ -7,4 +7,6 @@ data class ButterscotchSettings(
     // Bump this when we need to migrate an old settings.json to a newer shape
     val version: Int = 1,
     val enableHapticFeedback: Boolean = true,
+    // Vibration strength as a 10..100 percentage (the UI clamps the minimum to 10)
+    val hapticStrength: Int = 100,
 )

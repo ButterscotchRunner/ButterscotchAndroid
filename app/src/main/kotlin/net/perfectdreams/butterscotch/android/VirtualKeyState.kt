@@ -12,7 +12,9 @@ import net.perfectdreams.butterscotch.android.layouts.InputBinding
 //
 // Bindings are the digital InputBinding model (keyboard key or gamepad button). The data classes
 // give us correct equals/hashCode, so they work directly as refcount/set keys.
-class VirtualKeyState(val runner: ButterscotchDroidRunner) {
+// onPress fires on every digital down edge (a binding going from up to held), so on-screen action
+// buttons and the dpad can buzz. The analog stick bypasses this (it uses setAxis), so it stays silent.
+class VirtualKeyState(val runner: ButterscotchDroidRunner, private val onPress: () -> Unit = {}) {
     private val refs = HashMap<InputBinding, Int>()
 
     // Last non-zero analog axis value per (device, axisIndex), packed into a Long key. Analog sticks
@@ -29,6 +31,7 @@ class VirtualKeyState(val runner: ButterscotchDroidRunner) {
         val newCount = (refs[binding] ?: 0) + 1
         refs[binding] = newCount
         if (newCount == 1) {
+            onPress()
             dispatch(binding, isDown = true)
         }
     }

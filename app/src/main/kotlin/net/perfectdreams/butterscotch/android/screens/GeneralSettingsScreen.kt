@@ -6,17 +6,22 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import net.perfectdreams.butterscotch.android.components.ButterscotchBackButton
 import net.perfectdreams.butterscotch.android.components.ButterscotchTopBar
 import net.perfectdreams.butterscotch.android.components.InputToggle
+import net.perfectdreams.butterscotch.android.input.Haptics
 import net.perfectdreams.butterscotch.android.layouts.LayoutLibrary
 import net.perfectdreams.butterscotch.android.library.GameLibrary
 import net.perfectdreams.butterscotch.android.settings.SettingsStore
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,6 +31,11 @@ fun GeneralSettingsScreen(
     settingsStore: SettingsStore,
     nav: NavHostController,
 ) {
+    val context = LocalContext.current
+    // Used only to play a sample buzz so the user can feel the strength they picked
+    val previewHaptics = remember { Haptics(context) }
+    val settings = settingsStore.settings
+
     Scaffold(
         topBar = {
             ButterscotchTopBar("Settings", nav, navigationIcon = { ButterscotchBackButton(nav) })
@@ -33,11 +43,22 @@ fun GeneralSettingsScreen(
     ) { innerPadding ->
         Box(Modifier.fillMaxSize().padding(innerPadding).padding(24.dp)) {
             Column {
-                InputToggle("Enable Haptic Feedback", null, settingsStore.settings.enableHapticFeedback) { enabled ->
+                InputToggle("Enable Haptic Feedback", null, settings.enableHapticFeedback) { enabled ->
                     settingsStore.update { copy(enableHapticFeedback = enabled) }
                 }
 
-                Text("Howdy!!!")
+                if (settings.enableHapticFeedback) {
+                    Text("Haptic Strength: ${settings.hapticStrength}%")
+                    Slider(
+                        value = settings.hapticStrength.toFloat(),
+                        onValueChange = { settingsStore.update { copy(hapticStrength = it.roundToInt()) } },
+                        // Buzz once at the chosen level when the user lets go, so they can feel it
+                        onValueChangeFinished = { previewHaptics.tick(settings.hapticStrength) },
+                        valueRange = 10f..100f,
+                        // 10..100 in steps of 10 = 10 stops, which is 8 ticks between the endpoints
+                        steps = 8,
+                    )
+                }
             }
         }
     }

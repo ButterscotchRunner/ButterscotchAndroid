@@ -47,11 +47,13 @@ import net.perfectdreams.butterscotch.android.components.GameControls
 import net.perfectdreams.butterscotch.android.components.GamepadEditorState
 import net.perfectdreams.butterscotch.android.components.GamepadEditorToolbar
 import net.perfectdreams.butterscotch.android.components.MenuOverlay
+import net.perfectdreams.butterscotch.android.input.Haptics
 import net.perfectdreams.butterscotch.android.layouts.GamepadElement
 import net.perfectdreams.butterscotch.android.layouts.GamepadLayout
 import net.perfectdreams.butterscotch.android.layouts.GmlMouseButton
 import net.perfectdreams.butterscotch.android.layouts.LayoutLibrary
 import net.perfectdreams.butterscotch.android.library.GameLibrary
+import net.perfectdreams.butterscotch.android.settings.SettingsStore
 import net.perfectdreams.butterscotch.android.theme.ButterscotchAndroidTheme
 import java.util.UUID
 
@@ -72,12 +74,16 @@ class GameActivity : ComponentActivity() {
     var butterscotchRunner: ButterscotchDroidRunner? = null
     lateinit var gameLibrary: GameLibrary
     lateinit var layoutLibrary: LayoutLibrary
+    lateinit var settingsStore: SettingsStore
+    lateinit var haptics: Haptics
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         gameLibrary = Libraries.loadGameLibrary(this.applicationContext)
         layoutLibrary = Libraries.loadLayoutLibrary(this.applicationContext)
+        settingsStore = Libraries.loadSettingsStore(this.applicationContext)
+        haptics = Haptics(this.applicationContext)
 
         // Keep the screen on while the game runs - matches the GLFW build's default behavior.
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -129,11 +135,17 @@ class GameActivity : ComponentActivity() {
 
         setContent {
             ButterscotchAndroidTheme {
+                // Reads both settings fields at call time, so toggling them takes effect live
+                val performHaptic = {
+                    val s = settingsStore.settings
+                    if (s.enableHapticFeedback) haptics.tick(s.hapticStrength)
+                }
+
                 // VirtualKeyState lives here (not inside the gamepad) so we can release-all on layout
                 // changes that reflow the gamepad's Composable tree. If it lived inside GameControls
                 // and Compose discarded that subtree across an orientation flip, held keys could "leak"
                 // into the runner with no Composable left to release them.
-                val keys = remember { VirtualKeyState(butterscotchRunner) }
+                val keys = remember { VirtualKeyState(butterscotchRunner, performHaptic) }
 
                 var menuOpen by remember { mutableStateOf(false) }
                 // Free cam state lives on the runner (single source of truth, read on the render thread);
@@ -285,6 +297,7 @@ class GameActivity : ComponentActivity() {
                         }
 
                         val onFastForwardPress = { it: GamepadElement.FastForward ->
+                            performHaptic()
                             if (it.toggle && fastForwardActiveButtonId == it.id) {
                                 fastForwardActiveButtonId = null
                             } else {
@@ -332,6 +345,7 @@ class GameActivity : ComponentActivity() {
                                             editModeState = editorState,
                                             activeFastForwardButtonId = fastForwardActiveButtonId,
                                             onMenuOpen = {
+                                                performHaptic()
                                                 menuOpen = true
                                             },
                                             onFastForwardPress = onFastForwardPress,
@@ -368,6 +382,7 @@ class GameActivity : ComponentActivity() {
                                             editModeState = editorState,
                                             activeFastForwardButtonId = fastForwardActiveButtonId,
                                             onMenuOpen = {
+                                                performHaptic()
                                                 menuOpen = true
                                             },
                                             onFastForwardPress = onFastForwardPress,
