@@ -62,7 +62,7 @@ object ButterscotchNative {
      * [osType] is the value reported to GML's os_type / os_* builtins (a [GameEntry.RunnerOs.nativeValue]).
      * The C side stashes it in a static and reuses it across game_change rebuilds.
      */
-    external fun startRunner(dataWinPath: String, savesPath: String, osType: Int): Boolean
+    external fun startRunner(dataWinPath: String, savesPath: String, osType: Int, hostFramebuffer: Int): Boolean
 
     /**
      * Clear the runner's "key pressed this frame" state. Must be called at the top of each frame,

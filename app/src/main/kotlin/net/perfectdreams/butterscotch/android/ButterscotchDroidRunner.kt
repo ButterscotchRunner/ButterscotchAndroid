@@ -77,7 +77,7 @@ class ButterscotchDroidRunner(val dataWinPath: String, val savesPath: String, va
                 if (!runnerStarted) {
                     // We only start the runner here because we NEED to have an EGL context, because the GLRenderer needs it on glInit
                     Log.i(TAG, "Starting runner...")
-                    ButterscotchNative.startRunner(dataWinPath, savesPath, osType)
+                    ButterscotchNative.startRunner(dataWinPath, savesPath, osType, 0)
                     runnerStarted = true
                 }
 
