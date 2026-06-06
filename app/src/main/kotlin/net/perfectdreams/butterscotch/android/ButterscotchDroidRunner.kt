@@ -54,6 +54,8 @@ class ButterscotchDroidRunner(val assets: AssetManager, val dataWinPath: String,
     val freeCamera = MutableStateFlow(FreeCameraState())
     var fboId: Int = 0
     var blitTextureId: Int = 0
+    private var fboWidth: Int = 0
+    private var fboHeight: Int = 0
     val shaderManager = ShaderManager()
     lateinit var blitShader: BlitShader
 
@@ -123,6 +125,9 @@ class ButterscotchDroidRunner(val assets: AssetManager, val dataWinPath: String,
                     val frameStartNs = System.nanoTime()
                     val deltaTimeSeconds = ((frameStartNs - lastFrameStartNs) / 1_000_000_000.0).toFloat()
                     lastFrameStartNs = frameStartNs
+
+                    // Resize the host framebuffer before stepAndDraw, which is where the runner blits into it
+                    ensureFramebufferSize()
 
                     ButterscotchNative.beginFrame()
                     drainPendingInput()
@@ -314,7 +319,6 @@ class ButterscotchDroidRunner(val assets: AssetManager, val dataWinPath: String,
         GLES20.glGenTextures(1, textures, 0)
         blitTextureId = textures[0]
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, blitTextureId)
-        GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA, egl.width, egl.height, 0, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, null)
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
@@ -326,11 +330,26 @@ class ButterscotchDroidRunner(val assets: AssetManager, val dataWinPath: String,
         GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fboId)
         GLES20.glFramebufferTexture2D(GLES20.GL_FRAMEBUFFER, GLES20.GL_COLOR_ATTACHMENT0, GLES20.GL_TEXTURE_2D, blitTextureId, 0)
 
+        // Allocate the color attachment storage at the current surface size
+        ensureFramebufferSize()
+
         val status = GLES20.glCheckFramebufferStatus(GLES20.GL_FRAMEBUFFER)
         check(status == GLES20.GL_FRAMEBUFFER_COMPLETE) { "Framebuffer is not complete! Status is $status" }
 
         val blitVertexShader = assets.open("shaders/blit.vsh").readBytes().toString(Charsets.UTF_8)
         val blitFragmentShader = assets.open("shaders/blit.fsh").readBytes().toString(Charsets.UTF_8)
         blitShader = shaderManager.loadShader(blitVertexShader, blitFragmentShader) { BlitShader(it) }
+    }
+
+    // Reallocate the host framebuffer color texture when the surface size changes, otherwise the runner letterbox blits into a stale sized texture after a rotation
+    // The texture id and the framebuffer attachment stay valid across the reallocation, so nothing needs re-attaching
+    private fun ensureFramebufferSize() {
+        if (egl.width == fboWidth && egl.height == fboHeight)
+            return
+
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, blitTextureId)
+        GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA, egl.width, egl.height, 0, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, null)
+        fboWidth = egl.width
+        fboHeight = egl.height
     }
 }
