@@ -154,6 +154,52 @@ object GameImporter {
     }
 
     /**
+     * Import a ZIP already held in memory as a [ByteArray] (e.g. a sample game downloaded over HTTP).
+     * Same locate-the-WAD-anywhere behavior as the Uri overload. [fallbackName] is used as the
+     * suggested title when the WAD has no GEN8 name.
+     */
+    suspend fun importZip(
+        context: Context,
+        zipBytes: ByteArray,
+        library: GameLibrary,
+        fallbackName: String = "Imported Game",
+        writeFileCallback: (String) -> (Unit)
+    ): Result = withContext(Dispatchers.IO) {
+        val staged = library.beginStaging()
+
+        // Extract into a sibling temp dir first so we can locate the WAD wherever it is, then move
+        // its containing directory into the bundle.
+        val temp = File(staged.bundleDir.parentFile, "extract-tmp")
+        if (temp.exists()) temp.deleteRecursively()
+        temp.mkdirs()
+
+        try {
+            extractZip(zipBytes, temp, writeFileCallback)
+        } catch (e: Exception) {
+            Log.e(TAG, "Zip extraction failed for in-memory ZIP", e)
+            temp.deleteRecursively()
+            library.discardStaging(staged)
+            return@withContext Result.Failure("Couldn't extract ZIP: ${e.message}")
+        }
+
+        val wadFile = temp.walkTopDown().firstOrNull { it.isFile && it.name in WAD_FILENAMES }
+        if (wadFile == null) {
+            temp.deleteRecursively()
+            library.discardStaging(staged)
+            return@withContext Result.MissingWad(fallbackName)
+        }
+
+        // The directory holding the WAD becomes the bundle root; copy its contents into the bundle.
+        val wadRoot = wadFile.parentFile ?: temp
+        for (child in wadRoot.listFiles() ?: emptyArray()) {
+            child.copyRecursively(File(staged.bundleDir, child.name), overwrite = true)
+        }
+        temp.deleteRecursively()
+
+        finalize(library, staged, wadFile.name, fallbackName)
+    }
+
+    /**
      * Shared tail for both import paths: verify the WAD landed in the bundle, peek its GEN8
      * metadata, scan for icon candidates, and build the [Result.Success]. On the (bug) case where
      * the WAD is missing after copy, discards the staging dir and returns [Result.Failure].
@@ -224,26 +270,34 @@ object GameImporter {
     private fun extractZip(context: Context, source: Uri, dest: File, writeFileCallback: (String) -> (Unit)) {
         val input = context.contentResolver.openInputStream(source)
             ?: error("Could not open input stream for $source")
-        input.use { ins ->
-            ZipInputStream(ins.buffered()).use { zip ->
-                while (true) {
-                    val entry = zip.nextEntry ?: break
-                    val safeName = entry.name.replace('\\', '/')
-                    if (safeName.contains("..")) {
-                        // Defend against zip slip — refuse entries that would escape the dest dir.
-                        zip.closeEntry()
-                        continue
-                    }
-                    val target = File(dest, safeName)
-                    if (entry.isDirectory) {
-                        target.mkdirs()
-                    } else {
-                        target.parentFile?.mkdirs()
-                        writeFileCallback.invoke(target.name)
-                        target.outputStream().use { out -> zip.copyTo(out) }
-                    }
+        input.use { extractZipStream(it, dest, writeFileCallback) }
+    }
+
+    /** [extractZip] for a ZIP already held in memory. */
+    private fun extractZip(zipBytes: ByteArray, dest: File, writeFileCallback: (String) -> (Unit)) {
+        zipBytes.inputStream().use { extractZipStream(it, dest, writeFileCallback) }
+    }
+
+    /** Core ZIP extraction shared by both [extractZip] overloads. Refuses zip-slip entries. */
+    private fun extractZipStream(input: java.io.InputStream, dest: File, writeFileCallback: (String) -> (Unit)) {
+        ZipInputStream(input.buffered()).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                val safeName = entry.name.replace('\\', '/')
+                if (safeName.contains("..")) {
+                    // Defend against zip slip — refuse entries that would escape the dest dir.
                     zip.closeEntry()
+                    continue
                 }
+                val target = File(dest, safeName)
+                if (entry.isDirectory) {
+                    target.mkdirs()
+                } else {
+                    target.parentFile?.mkdirs()
+                    writeFileCallback.invoke(target.name)
+                    target.outputStream().use { out -> zip.copyTo(out) }
+                }
+                zip.closeEntry()
             }
         }
     }

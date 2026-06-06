@@ -2,8 +2,10 @@ package net.perfectdreams.butterscotch.android.screens
 
 import android.graphics.Bitmap
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,7 +32,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import io.ktor.client.request.get
+import io.ktor.client.statement.bodyAsBytes
+import io.ktor.client.statement.bodyAsText
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import net.perfectdreams.butterscotch.android.ButterscotchUtils
 import net.perfectdreams.butterscotch.android.GameImporter
 import net.perfectdreams.butterscotch.android.components.ButterscotchBackButton
 import net.perfectdreams.butterscotch.android.components.ButterscotchTopBar
@@ -38,7 +47,9 @@ import net.perfectdreams.butterscotch.android.components.rememberGameMetadataFor
 import net.perfectdreams.butterscotch.android.layouts.LayoutLibrary
 import net.perfectdreams.butterscotch.android.library.GameEntry
 import net.perfectdreams.butterscotch.android.library.GameEntry.GameType
+import net.perfectdreams.butterscotch.android.library.GameEntry.GameType.*
 import net.perfectdreams.butterscotch.android.library.GameLibrary
+import net.perfectdreams.butterscotch.network.SampleGamesResponse
 import java.util.UUID
 
 /**
@@ -51,6 +62,7 @@ import java.util.UUID
  */
 private sealed interface ImportUIState {
     data object Intro : ImportUIState
+    data object SampleList : ImportUIState
     class Copying : ImportUIState {
         var currentFile by mutableStateOf<String?>(null)
     }
@@ -133,6 +145,9 @@ fun ImportScreen(
                 ImportUIState.Intro -> IntroPane(
                     onSelectFolder = { pickFolder.launch(null) },
                     onSelectZip = { pickZip.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) },
+                    onSelectSample = {
+                        state = ImportUIState.SampleList
+                    }
                 )
                 is ImportUIState.Copying -> CopyingPane(s.currentFile)
                 is ImportUIState.Configure -> ConfigurePane(
@@ -142,7 +157,7 @@ fun ImportScreen(
                         library.commit(
                             s.result.staged,
                             title,
-                            GameType.GameMakerStudio(
+                            GameMakerStudio(
                                 s.result.wadVersion,
                                 s.result.wadFilename
                             ),
@@ -161,13 +176,50 @@ fun ImportScreen(
                     message = s.message,
                     onDismiss = { state = s.previous },
                 )
+
+                ImportUIState.SampleList -> {
+                    var gameList by remember { mutableStateOf<SampleGamesResponse?>(null) }
+                    LaunchedEffect(Unit) {
+                        GlobalScope.launch {
+                            gameList = ButterscotchUtils.http.get("http://192.168.15.125:8080/api/samples").let {
+                                Json.decodeFromString<SampleGamesResponse>(it.bodyAsText())
+                            }
+                        }
+                    }
+
+                    if (gameList != null) {
+                        Column {
+                            val context = LocalContext.current
+                            for (game in gameList!!.games) {
+                                Box(modifier = Modifier.clickable(true) {
+                                    val copyingState = ImportUIState.Copying()
+                                    state = copyingState
+                                    scope.launch {
+                                        val zipBytes = ButterscotchUtils.http.get(game.downloadUrl).bodyAsBytes()
+                                        state = when (val result = GameImporter.importZip(context, zipBytes, library, game.name) { copyingState.currentFile = it }) {
+                                            is GameImporter.Result.Success -> ImportUIState.Configure(result)
+                                            is GameImporter.Result.MissingWad -> ImportUIState.Error(
+                                                "Missing WAD in ZIP!\n\nExpected one of: ${GameImporter.WAD_FILENAMES.joinToString(", ")}"
+                                            )
+                                            is GameImporter.Result.Failure -> ImportUIState.Error(result.message)
+                                        }
+                                    }
+                                }) {
+                                    Text(game.name)
+                                }
+                            }
+                        }
+                    } else {
+
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun IntroPane(onSelectFolder: () -> Unit, onSelectZip: () -> Unit) {
+private fun IntroPane(onSelectFolder: () -> Unit, onSelectZip: () -> Unit, onSelectSample: () -> (Unit)) {
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
@@ -180,11 +232,14 @@ private fun IntroPane(onSelectFolder: () -> Unit, onSelectZip: () -> Unit) {
         )
         Spacer(Modifier.height(24.dp))
         Button(onClick = onSelectFolder) {
-            Text("Import folder")
+            Text("Import Folder")
         }
         Spacer(Modifier.height(12.dp))
         Button(onClick = onSelectZip) {
             Text("Import ZIP")
+        }
+        Button(onClick = onSelectSample) {
+            Text("Import Sample")
         }
     }
 }
