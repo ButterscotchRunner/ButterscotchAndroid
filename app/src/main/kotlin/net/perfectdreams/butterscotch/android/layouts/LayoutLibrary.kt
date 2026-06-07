@@ -102,6 +102,19 @@ class LayoutLibrary private constructor(
         save()
     }
 
+    // Serializes a single layout to pretty-printed JSON for sharing/export
+    fun exportToJson(layout: GamepadLayout): String = json.encodeToString(layout)
+
+    // Parses a shared layout JSON and stores it as a brand-new copy. The id is always regenerated so an
+    // import never overwrites an existing layout nor collides with a built-in default (which would be shadowed
+    // on the next load). Throws if the text isn't a valid layout. Returns the stored copy.
+    fun importFromJson(text: String): GamepadLayout {
+        val parsed = json.decodeFromString<GamepadLayout>(text)
+        val copy = parsed.copy(id = UUID.randomUUID())
+        upsert(copy)
+        return copy
+    }
+
     // True for the two built-in layouts, which are re-seeded on every load and can't be edited or deleted
     fun isBuiltIn(id: UUID): Boolean = id == DEFAULT_PORTRAIT_LAYOUT || id == DEFAULT_LANDSCAPE_LAYOUT
 

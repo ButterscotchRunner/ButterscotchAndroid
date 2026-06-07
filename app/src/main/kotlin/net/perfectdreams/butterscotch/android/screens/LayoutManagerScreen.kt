@@ -8,18 +8,24 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -31,12 +37,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import net.perfectdreams.butterscotch.android.components.ButterscotchBackButton
 import net.perfectdreams.butterscotch.android.components.ButterscotchTopBar
 import net.perfectdreams.butterscotch.android.layouts.GamepadLayout
@@ -58,12 +68,54 @@ fun LayoutManagerScreen(
     layoutLibrary: LayoutLibrary,
     nav: NavHostController,
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
     var renameTarget by remember { mutableStateOf<GamepadLayout?>(null) }
     var deleteTarget by remember { mutableStateOf<GamepadLayout?>(null) }
+    // Held so the CreateDocument callback knows which layout to write once the user picks a destination
+    var exportTarget by remember { mutableStateOf<GamepadLayout?>(null) }
+
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        val target = exportTarget
+        exportTarget = null
+        if (uri == null || target == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            try {
+                val payload = layoutLibrary.exportToJson(target)
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.use { it.write(payload.toByteArray(Charsets.UTF_8)) } ?: error("Could not open destination")
+                }
+                Toast.makeText(context, "Exported ${target.fancyName}", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Export failed: ${e.message ?: "unknown error"}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            try {
+                val text = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) } ?: error("Could not open file")
+                }
+                val imported = layoutLibrary.importFromJson(text)
+                Toast.makeText(context, "Imported ${imported.fancyName}", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Import failed: ${e.message ?: "invalid layout file"}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
             ButterscotchTopBar("Gamepad Layouts", nav, navigationIcon = { ButterscotchBackButton(nav) })
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = { importLauncher.launch(arrayOf("application/json")) }) {
+                Icon(Icons.Filled.Add, contentDescription = "Import layout")
+            }
         },
     ) { innerPadding ->
         LazyColumn(
@@ -80,6 +132,11 @@ fun LayoutManagerScreen(
                     usedInGames = usedInGames,
                     onRename = { renameTarget = layout },
                     onDelete = { deleteTarget = layout },
+                    onExport = {
+                        exportTarget = layout
+                        val sanitized = layout.fancyName.replace(Regex("[^A-Za-z0-9._-]"), "_")
+                        exportLauncher.launch("$sanitized.json")
+                    },
                 )
             }
         }
@@ -121,6 +178,7 @@ private fun LayoutTile(
     usedInGames: Int,
     onRename: () -> Unit,
     onDelete: () -> Unit,
+    onExport: () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
 
@@ -151,24 +209,27 @@ private fun LayoutTile(
             }
 
             // The menu must live in the same Box as its anchor, otherwise the popup spawns at the row's origin
-            if (!builtIn) {
-                Box {
-                    IconButton(onClick = { menuOpen = true }) {
-                        Icon(Icons.Filled.MoreVert, contentDescription = "Manage layout")
-                    }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        // Built-in defaults are re-seeded every load, so they can't be renamed or deleted
+            Box {
+                IconButton(onClick = { menuOpen = true }) {
+                    Icon(Icons.Filled.MoreVert, contentDescription = "Manage layout")
+                }
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    // Export works for every layout, including the built-in defaults (handy as a starting point)
+                    DropdownMenuItem(
+                        text = { Text("Export") },
+                        leadingIcon = { Icon(Icons.Filled.Share, contentDescription = null) },
+                        onClick = { menuOpen = false; onExport() },
+                    )
+                    // Built-in defaults are re-seeded every load, so they can't be renamed or deleted
+                    if (!builtIn) {
                         DropdownMenuItem(
                             text = { Text("Rename") },
                             leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
-                            enabled = true,
                             onClick = { menuOpen = false; onRename() },
                         )
                         DropdownMenuItem(
-                            // Only force the error color while enabled; a disabled item should use the default grayed look
                             text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
-                            leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null, tint = if (builtIn) Color.Unspecified else MaterialTheme.colorScheme.error) },
-                            enabled = true,
+                            leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                             onClick = { menuOpen = false; onDelete() },
                         )
                     }
