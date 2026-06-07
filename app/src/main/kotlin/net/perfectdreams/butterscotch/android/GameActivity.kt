@@ -446,7 +446,7 @@ class GameActivity : ComponentActivity() {
                                 butterscotchRunner.requestExit()
                             },
                             onEditLayout = {
-                                editorState = GamepadEditorState(keys, layout)
+                                editorState = GamepadEditorState(liveEntry.title, keys, layout)
                             },
                             onEnableFreeCam = {
                                 butterscotchRunner.freeCamera.update { it.copy(active = true) }

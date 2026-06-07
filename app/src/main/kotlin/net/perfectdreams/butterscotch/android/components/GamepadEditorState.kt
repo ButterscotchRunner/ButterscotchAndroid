@@ -10,7 +10,7 @@ import net.perfectdreams.butterscotch.android.layouts.GamepadElement
 import net.perfectdreams.butterscotch.android.layouts.GamepadLayout
 import java.util.UUID
 
-class GamepadEditorState(val keys: VirtualKeyState, var initialLayout: GamepadLayout) {
+class GamepadEditorState(val gameName: String, val keys: VirtualKeyState, var initialLayout: GamepadLayout) {
     var layout by mutableStateOf(initialLayout)
     var snapToGrid by mutableStateOf(false)
     var editingId by mutableStateOf<UUID?>(null)

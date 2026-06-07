@@ -192,7 +192,7 @@ fun BoxWithConstraintsScope.GamepadEditorToolbar(
 
     if (showSaveAsDialog) {
         SaveAsLayoutDialog(
-            initialName = state.layout.fancyName,
+            initialName = state.gameName,
             onConfirm = { name ->
                 showSaveAsDialog = false
                 onSaveAs(name)
