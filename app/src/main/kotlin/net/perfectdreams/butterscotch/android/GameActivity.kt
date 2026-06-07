@@ -309,6 +309,10 @@ class GameActivity : ComponentActivity() {
                                 currentEditorState.layout = layout
                                 currentEditorState.initialLayout = layout // Keep it synchronized if we ever add a option to revert changes without exiting
                             }
+
+                            // Also disable fast forward and mouse button state
+                            fastForwardActiveButtonId = null
+                            mouseButtonOverride.value = GmlMouseButton.LEFT_BUTTON
                         }
 
                         val onFastForwardPress = { it: GamepadElement.FastForward ->
