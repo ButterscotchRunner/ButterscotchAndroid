@@ -180,7 +180,7 @@ private fun CandidateTile(
     ) {
         IconThumb(bitmap = candidate.bitmap, fallbackContext = null, modifier = Modifier.size(64.dp))
         Spacer(Modifier.height(4.dp))
-        Text(candidate.sourceExe, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+        Text(candidate.source, style = MaterialTheme.typography.labelSmall, maxLines = 1)
         Text("${candidate.size}px", style = MaterialTheme.typography.labelSmall)
     }
 }

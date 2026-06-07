@@ -70,6 +70,7 @@ android {
     buildTypes {
         release {
             buildConfigField("boolean", "FORCE_BUTTERSCOTCH_PLUS", "false")
+            buildConfigField("String", "API_BASE_URL", "\"https://butterscotch.perfectdreams.net\"")
 
             isMinifyEnabled = true
             isShrinkResources = true
@@ -87,6 +88,7 @@ android {
 
         debug {
             buildConfigField("boolean", "FORCE_BUTTERSCOTCH_PLUS", "false")
+            buildConfigField("String", "API_BASE_URL", "\"http://192.168.15.125:8080\"")
         }
     }
     compileOptions {

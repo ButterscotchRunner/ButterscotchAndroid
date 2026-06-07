@@ -10,8 +10,8 @@ import java.io.File
  */
 data class IconCandidate(
     val bitmap: Bitmap,
-    /** Filename of the .exe this icon was extracted from (for display in the picker). */
-    val sourceExe: String,
+    /** The source of the image (for display in the picker). */
+    val source: String,
     /** Pixel size of the icon's longest edge — used to label and rank picks. */
     val size: Int,
 )
@@ -40,7 +40,7 @@ fun scanIconCandidates(bundleDir: File): List<IconCandidate> {
             val bitmap = IcoDecoder.decodeLargest(group.toIcoBytes()) ?: continue
             candidates += IconCandidate(
                 bitmap = bitmap,
-                sourceExe = exe.name,
+                source = exe.name,
                 size = maxOf(bitmap.width, bitmap.height),
             )
         }

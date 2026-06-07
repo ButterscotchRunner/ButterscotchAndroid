@@ -1,6 +1,7 @@
 package net.perfectdreams.butterscotch.android
 
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Log
@@ -12,6 +13,7 @@ import net.perfectdreams.butterscotch.android.pe.IconCandidate
 import net.perfectdreams.butterscotch.android.pe.scanIconCandidates
 import java.io.File
 import java.util.zip.ZipInputStream
+import kotlin.math.max
 
 /**
  * Copies a user-picked folder (via Storage Access Framework tree Uri) into the app's per-game
@@ -54,7 +56,7 @@ object GameImporter {
         data class Success(
             val staged: GameLibrary.StagedGame,
             val wadFilename: String,
-            val suggestedTitle: String?,
+            val suggestedTitle: String,
             val wadVersion: Int,
             val folderName: String,
             val iconCandidates: List<IconCandidate>,
@@ -99,7 +101,7 @@ object GameImporter {
             return@withContext Result.Failure("Couldn't copy folder: ${e.message}")
         }
 
-        finalize(library, staged, wadFilename, folderName)
+        finalize(library, staged, wadFilename, folderName, null, emptyList())
     }
 
     /**
@@ -150,7 +152,7 @@ object GameImporter {
         }
         temp.deleteRecursively()
 
-        finalize(library, staged, wadFile.name, fallbackName)
+        finalize(library, staged, wadFile.name, fallbackName, null, emptyList())
     }
 
     /**
@@ -159,10 +161,10 @@ object GameImporter {
      * suggested title when the WAD has no GEN8 name.
      */
     suspend fun importZip(
-        context: Context,
-        zipBytes: ByteArray,
         library: GameLibrary,
-        fallbackName: String = "Imported Game",
+        zipBytes: ByteArray,
+        name: String,
+        iconAsBytes: ByteArray,
         writeFileCallback: (String) -> (Unit)
     ): Result = withContext(Dispatchers.IO) {
         val staged = library.beginStaging()
@@ -186,7 +188,7 @@ object GameImporter {
         if (wadFile == null) {
             temp.deleteRecursively()
             library.discardStaging(staged)
-            return@withContext Result.MissingWad(fallbackName)
+            return@withContext Result.MissingWad(name)
         }
 
         // The directory holding the WAD becomes the bundle root; copy its contents into the bundle.
@@ -196,7 +198,9 @@ object GameImporter {
         }
         temp.deleteRecursively()
 
-        finalize(library, staged, wadFile.name, fallbackName)
+        val decodedIcon = BitmapFactory.decodeByteArray(iconAsBytes, 0, iconAsBytes.size)
+
+        finalize(library, staged, wadFile.name, name, name, listOf(IconCandidate(decodedIcon, "Sample", max(decodedIcon.width, decodedIcon.height))))
     }
 
     /**
@@ -209,6 +213,8 @@ object GameImporter {
         staged: GameLibrary.StagedGame,
         wadFilename: String,
         fallbackName: String,
+        overrideName: String? = null,
+        additionalIconCandidates: List<IconCandidate>
     ): Result {
         val wadFile = File(staged.bundleDir, wadFilename)
         if (!wadFile.exists()) {
@@ -226,12 +232,12 @@ object GameImporter {
 
         val iconCandidates = runCatching { scanIconCandidates(staged.bundleDir) }
             .onFailure { Log.w(TAG, "Icon extraction failed for ${staged.id}", it) }
-            .getOrDefault(emptyList())
+            .getOrDefault(emptyList()) + additionalIconCandidates
 
         return Result.Success(
             staged = staged,
             wadFilename = wadFilename,
-            suggestedTitle = suggestedTitle,
+            suggestedTitle = overrideName ?: suggestedTitle ?: fallbackName,
             wadVersion = wadVersion,
             folderName = fallbackName,
             iconCandidates = iconCandidates,

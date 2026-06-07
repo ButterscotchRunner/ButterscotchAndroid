@@ -1,21 +1,27 @@
 package net.perfectdreams.butterscotch.android.screens
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -28,6 +34,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -38,6 +48,7 @@ import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import net.perfectdreams.butterscotch.android.BuildConfig
 import net.perfectdreams.butterscotch.android.ButterscotchUtils
 import net.perfectdreams.butterscotch.android.GameImporter
 import net.perfectdreams.butterscotch.android.components.ButterscotchBackButton
@@ -46,8 +57,7 @@ import net.perfectdreams.butterscotch.android.components.MetadataForm
 import net.perfectdreams.butterscotch.android.components.rememberGameMetadataFormState
 import net.perfectdreams.butterscotch.android.layouts.LayoutLibrary
 import net.perfectdreams.butterscotch.android.library.GameEntry
-import net.perfectdreams.butterscotch.android.library.GameEntry.GameType
-import net.perfectdreams.butterscotch.android.library.GameEntry.GameType.*
+import net.perfectdreams.butterscotch.android.library.GameEntry.GameType.GameMakerStudio
 import net.perfectdreams.butterscotch.android.library.GameLibrary
 import net.perfectdreams.butterscotch.network.SampleGamesResponse
 import java.util.UUID
@@ -180,23 +190,24 @@ fun ImportScreen(
                 ImportUIState.SampleList -> {
                     var gameList by remember { mutableStateOf<SampleGamesResponse?>(null) }
                     LaunchedEffect(Unit) {
-                        GlobalScope.launch {
-                            gameList = ButterscotchUtils.http.get("http://192.168.15.125:8080/api/samples").let {
-                                Json.decodeFromString<SampleGamesResponse>(it.bodyAsText())
-                            }
+                        gameList = ButterscotchUtils.http.get("http://192.168.15.125:8080/api/samples").let {
+                            Json.decodeFromString<SampleGamesResponse>(it.bodyAsText())
                         }
                     }
 
                     if (gameList != null) {
                         Column {
-                            val context = LocalContext.current
+                            Text("Sample games that you can download and play in Butterscotch!")
+
+                            Spacer(Modifier.height(24.dp))
                             for (game in gameList!!.games) {
-                                Box(modifier = Modifier.clickable(true) {
+                                SampleGameTile(game) {
                                     val copyingState = ImportUIState.Copying()
                                     state = copyingState
                                     scope.launch {
-                                        val zipBytes = ButterscotchUtils.http.get(game.downloadUrl).bodyAsBytes()
-                                        state = when (val result = GameImporter.importZip(context, zipBytes, library, game.name) { copyingState.currentFile = it }) {
+                                        val zipAsBytes = ButterscotchUtils.http.get("/samples/${game.slug}/${game.version}/game.zip").bodyAsBytes()
+                                        val iconAsBytes = ButterscotchUtils.http.get("/samples/${game.slug}/${game.version}/icon.png").bodyAsBytes()
+                                        state = when (val result = GameImporter.importZip(library, zipAsBytes, game.name, iconAsBytes) { copyingState.currentFile = it }) {
                                             is GameImporter.Result.Success -> ImportUIState.Configure(result)
                                             is GameImporter.Result.MissingWad -> ImportUIState.Error(
                                                 "Missing WAD in ZIP!\n\nExpected one of: ${GameImporter.WAD_FILENAMES.joinToString(", ")}"
@@ -204,13 +215,19 @@ fun ImportScreen(
                                             is GameImporter.Result.Failure -> ImportUIState.Error(result.message)
                                         }
                                     }
-                                }) {
-                                    Text(game.name)
                                 }
                             }
                         }
                     } else {
-
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            CircularProgressIndicator()
+                            Spacer(Modifier.height(16.dp))
+                            Text("Loading...")
+                        }
                     }
                 }
             }
@@ -238,6 +255,7 @@ private fun IntroPane(onSelectFolder: () -> Unit, onSelectZip: () -> Unit, onSel
         Button(onClick = onSelectZip) {
             Text("Import ZIP")
         }
+        Spacer(Modifier.height(12.dp))
         Button(onClick = onSelectSample) {
             Text("Import Sample")
         }
@@ -268,7 +286,7 @@ private fun ConfigurePane(
 ) {
     // suggestedTitle comes from GEN8 (may be null for pre-WAD10 games); fall back to the folder
     // name so the user never sees an empty field.
-    val initial = result.suggestedTitle ?: result.folderName
+    val initial = result.suggestedTitle
 
     // The game is not committed yet, so there is no entry to compare against: these start from the same defaults commit() would apply and are passed straight through onSave at commit time.
     val state = rememberGameMetadataFormState(
@@ -302,5 +320,65 @@ private fun ErrorPane(message: String, onDismiss: () -> Unit) {
         Text(message, style = MaterialTheme.typography.bodyLarge)
         Spacer(Modifier.height(24.dp))
         Button(onClick = onDismiss) { Text("OK") }
+    }
+}
+
+@Composable
+private fun SampleGameIcon(
+    entry: SampleGamesResponse.Game,
+    modifier: Modifier = Modifier,
+) {
+    var bitmap by remember { mutableStateOf<Bitmap?>(null) }
+
+    LaunchedEffect(Unit) {
+        bitmap = ButterscotchUtils.http.get("/samples/${entry.slug}/${entry.version}/icon.png")
+            .bodyAsBytes()
+            .let { BitmapFactory.decodeByteArray(it, 0, it.size) }
+    }
+
+    val _bitmap = bitmap
+    if (_bitmap != null) {
+        Image(
+            painter = BitmapPainter(_bitmap.asImageBitmap(), filterQuality = FilterQuality.None),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = modifier,
+        )
+    }
+}
+
+@Composable
+private fun SampleGameTile(
+    entry: SampleGamesResponse.Game,
+    onSelect: () -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.clickable(onClick = onSelect).padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier
+                        .weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SampleGameIcon(entry, modifier = Modifier.size(42.dp))
+
+                    Column(modifier = Modifier.padding(start = 12.dp)) {
+                        Text(entry.name, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            entry.author,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            HorizontalDivider()
+
+            Spacer(Modifier.height(12.dp))
+
+            Text("A simple Sokoban-like game")
+        }
     }
 }
