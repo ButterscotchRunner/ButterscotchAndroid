@@ -23,5 +23,8 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "ButterscotchAndroid"
+
+include(":common")
+include(":backend")
 include(":app")
  

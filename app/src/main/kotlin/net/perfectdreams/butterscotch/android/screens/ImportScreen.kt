@@ -190,7 +190,7 @@ fun ImportScreen(
                 ImportUIState.SampleList -> {
                     var gameList by remember { mutableStateOf<SampleGamesResponse?>(null) }
                     LaunchedEffect(Unit) {
-                        gameList = ButterscotchUtils.http.get("http://192.168.15.125:8080/api/samples").let {
+                        gameList = ButterscotchUtils.http.get("${BuildConfig.API_BASE_URL}/api/samples").let {
                             Json.decodeFromString<SampleGamesResponse>(it.bodyAsText())
                         }
                     }
