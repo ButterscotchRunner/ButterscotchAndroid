@@ -45,6 +45,7 @@ import net.perfectdreams.butterscotch.android.layouts.Gamepad
 import net.perfectdreams.butterscotch.android.layouts.GamepadElement
 import net.perfectdreams.butterscotch.android.layouts.GamepadStick
 import net.perfectdreams.butterscotch.android.layouts.GmlKey
+import net.perfectdreams.butterscotch.android.layouts.GmlMouseButton
 import net.perfectdreams.butterscotch.android.layouts.InputBinding
 import net.perfectdreams.butterscotch.android.layouts.KeyTrigger
 import java.util.UUID
@@ -155,6 +156,18 @@ fun BoxWithConstraintsScope.GamepadEditorToolbar(
                             opacity = 1.0,
                             id = UUID.randomUUID(),
                             speed = 2.0f,
+                            toggle = true
+                        ))
+                    })
+                    DropdownMenuItem(text = { Text("Mouse Button") }, onClick = {
+                        addMenuExpanded = false
+                        state.add(GamepadElement.MouseButton(
+                            positionX = 0.5,
+                            positionY = 0.5,
+                            scale = 0.22,
+                            opacity = 1.0,
+                            id = UUID.randomUUID(),
+                            button = GmlMouseButton.RIGHT_BUTTON,
                             toggle = true
                         ))
                     })
@@ -297,6 +310,17 @@ fun BoxWithConstraintsScope.GamepadEditor(state: GamepadEditorState) {
                     editModifier
                 )
             }
+
+            is GamepadElement.MouseButton -> {
+                MouseButtonOverrideButton(
+                    false,
+                    false,
+                    element,
+                    {},
+                    {},
+                    editModifier
+                )
+            }
         }
     }
 
@@ -335,6 +359,7 @@ private fun ElementEditDialog(
                     is GamepadElement.AnalogJoystick -> "Edit analog stick"
                     is GamepadElement.Menu -> "Edit menu"
                     is GamepadElement.FastForward -> "Edit fast forward"
+                    is GamepadElement.MouseButton -> "Edit mouse button"
                 }
             )
         },
@@ -397,6 +422,23 @@ private fun ElementEditDialog(
                             steps = steps,
                             valueRange = 0.25f..8f
                         )
+
+                        RadioButtonWithContent(element.toggle, onClick = {
+                            onChange(element.copy(toggle = true))
+                        }) {
+                            Text("Toggle")
+                        }
+
+                        RadioButtonWithContent(!element.toggle, onClick = {
+                            onChange(element.copy(toggle = false))
+                        }) {
+                            Text("Hold")
+                        }
+                    }
+                    is GamepadElement.MouseButton -> {
+                        MouseButtonField(element.button) { onChange(element.copy(button = it)) }
+
+                        Spacer(Modifier.height(8.dp))
 
                         RadioButtonWithContent(element.toggle, onClick = {
                             onChange(element.copy(toggle = true))
@@ -531,6 +573,50 @@ private fun SlotField(device: Int, onChange: (Int) -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MouseButtonField(button: GmlMouseButton, onChange: (GmlMouseButton) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    val options = listOf(
+        GmlMouseButton.RIGHT_BUTTON,
+        GmlMouseButton.MIDDLE_BUTTON
+    )
+    fun labelFor(b: GmlMouseButton) = when (b) {
+        GmlMouseButton.LEFT_BUTTON -> error("This should NEVER happen!")
+        GmlMouseButton.RIGHT_BUTTON -> "Right Button"
+        GmlMouseButton.MIDDLE_BUTTON -> "Middle Button"
+    }
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+    ) {
+        OutlinedTextField(
+            value = labelFor(button),
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Mouse button") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                .fillMaxWidth()
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            for (b in options) {
+                DropdownMenuItem(
+                    text = { Text(labelFor(b)) },
+                    onClick = {
+                        onChange(b)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
 // Picks which gamepad button a "Gamepad Button" element sends. Stores the canonical button index.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -589,6 +675,7 @@ private fun GamepadElement.movedTo(px: Double, py: Double): GamepadElement = whe
     is GamepadElement.AnalogJoystick -> copy(positionX = px, positionY = py)
     is GamepadElement.Menu -> copy(positionX = px, positionY = py)
     is GamepadElement.FastForward -> copy(positionX = px, positionY = py)
+    is GamepadElement.MouseButton -> copy(positionX = px, positionY = py)
 }
 private fun GamepadElement.withScale(s: Double): GamepadElement = when (this) {
     is GamepadElement.Key -> copy(scale = s)
@@ -596,6 +683,7 @@ private fun GamepadElement.withScale(s: Double): GamepadElement = when (this) {
     is GamepadElement.AnalogJoystick -> copy(scale = s)
     is GamepadElement.Menu -> copy(scale = s)
     is GamepadElement.FastForward -> copy(scale = s)
+    is GamepadElement.MouseButton -> copy(scale = s)
 }
 private fun GamepadElement.withOpacity(o: Double): GamepadElement = when (this) {
     is GamepadElement.Key -> copy(opacity = o)
@@ -603,6 +691,7 @@ private fun GamepadElement.withOpacity(o: Double): GamepadElement = when (this) 
     is GamepadElement.AnalogJoystick -> copy(opacity = o)
     is GamepadElement.Menu -> copy(opacity = o)
     is GamepadElement.FastForward -> copy(opacity = o)
+    is GamepadElement.MouseButton -> copy(opacity = o)
 }
 
 // Read the integer code behind a binding (keyboard vk or gamepad button number), used to find the

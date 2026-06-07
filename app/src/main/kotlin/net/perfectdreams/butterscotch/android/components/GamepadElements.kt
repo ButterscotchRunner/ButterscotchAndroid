@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Mouse
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -113,6 +114,47 @@ fun FastForwardButton(
         Icon(
             imageVector = Icons.Default.FastForward,
             contentDescription = "Enable fast forward",
+            tint = Color.White,
+            // The Box is sized by placement (scale * shorter side), so size the glyph as a fraction of it
+            modifier = Modifier.fillMaxSize(0.55f)
+        )
+    }
+}
+
+@Composable
+fun MouseButtonOverrideButton(
+    isActive: Boolean,
+    interactive: Boolean,
+    element: GamepadElement.MouseButton,
+    onMouseButtonPress: (GamepadElement.MouseButton) -> (Unit),
+    onMouseButtonRelease: (GamepadElement.MouseButton) -> (Unit),
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(CircleShape)
+            .background(if (isActive) ButterscotchPrimary.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.22f))
+            .pointerInput(Unit) {
+                if (interactive) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        down.consume()
+
+                        if (!element.toggle) {
+                            onMouseButtonPress.invoke(element)
+                            waitForUpOrCancellation()
+                            onMouseButtonRelease.invoke(element)
+                        } else {
+                            onMouseButtonPress.invoke(element)
+                        }
+                    }
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = Icons.Default.Mouse,
+            contentDescription = "Enable mouse button",
             tint = Color.White,
             // The Box is sized by placement (scale * shorter side), so size the glyph as a fraction of it
             modifier = Modifier.fillMaxSize(0.55f)

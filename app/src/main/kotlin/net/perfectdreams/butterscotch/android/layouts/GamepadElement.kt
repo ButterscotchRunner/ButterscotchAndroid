@@ -89,6 +89,19 @@ sealed class GamepadElement {
     ) : GamepadElement()
 
     @Serializable
+    @SerialName("MouseButton")
+    data class MouseButton(
+        @Serializable(with = UUIDAsStringSerializer::class)
+        override val id: UUID,
+        override val positionX: Double,
+        override val positionY: Double,
+        override val scale: Double,
+        override val opacity: Double,
+        val button: GmlMouseButton,
+        val toggle: Boolean
+    ) : GamepadElement()
+
+    @Serializable
     @SerialName("FastForward")
     data class FastForward(
         @Serializable(with = UUIDAsStringSerializer::class)

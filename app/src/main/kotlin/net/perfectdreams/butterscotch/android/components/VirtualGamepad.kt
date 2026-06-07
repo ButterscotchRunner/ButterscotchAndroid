@@ -85,9 +85,12 @@ fun GameControls(
     layout: GamepadLayout,
     editModeState: GamepadEditorState?,
     activeFastForwardButtonId: UUID?,
+    activeMouseButtonId: UUID?,
     onMenuOpen: () -> (Unit),
     onFastForwardPress: (GamepadElement.FastForward) -> (Unit),
     onFastForwardRelease: (GamepadElement.FastForward) -> (Unit),
+    onMouseButtonPress: (GamepadElement.MouseButton) -> (Unit),
+    onMouseButtonRelease: (GamepadElement.MouseButton) -> (Unit),
     keys: VirtualKeyState,
     modifier: Modifier = Modifier
 ) {
@@ -95,7 +98,7 @@ fun GameControls(
         if (editModeState != null) {
             GamepadEditor(editModeState)
         } else {
-            PlayableGamepad(layout = layout, keys = keys, activeFastForwardButtonId, onFastForwardPress = onFastForwardPress, onFastForwardRelease = onFastForwardRelease) {
+            PlayableGamepad(layout = layout, keys = keys, activeFastForwardButtonId, activeMouseButtonId, onFastForwardPress = onFastForwardPress, onFastForwardRelease = onFastForwardRelease, onMouseButtonPress = onMouseButtonPress, onMouseButtonRelease = onMouseButtonRelease) {
                 onMenuOpen.invoke()
             }
         }
@@ -138,8 +141,11 @@ private fun BoxWithConstraintsScope.PlayableGamepad(
     layout: GamepadLayout,
     keys: VirtualKeyState,
     activeFastForwardButtonId: UUID?,
+    activeMouseButtonId: UUID?,
     onFastForwardPress: (GamepadElement.FastForward) -> (Unit),
     onFastForwardRelease: (GamepadElement.FastForward) -> (Unit),
+    onMouseButtonPress: (GamepadElement.MouseButton) -> (Unit),
+    onMouseButtonRelease: (GamepadElement.MouseButton) -> (Unit),
     onMenuOpen: () -> (Unit)
 ) {
     layout.elements.forEach { element ->
@@ -189,6 +195,17 @@ private fun BoxWithConstraintsScope.PlayableGamepad(
                     element,
                     onFastForwardPress,
                     onFastForwardRelease,
+                    placement
+                )
+            }
+
+            is GamepadElement.MouseButton -> {
+                MouseButtonOverrideButton(
+                    activeMouseButtonId == element.id,
+                    true,
+                    element,
+                    onMouseButtonPress,
+                    onMouseButtonRelease,
                     placement
                 )
             }

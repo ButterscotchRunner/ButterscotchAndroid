@@ -38,6 +38,7 @@ import kotlinx.coroutines.flow.update
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerId
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalResources
@@ -154,6 +155,9 @@ class GameActivity : ComponentActivity() {
                 // we observe it here so the UI reacts to it.
                 val freeCam by butterscotchRunner.freeCamera.collectAsState()
                 var fastForwardActiveButtonId by remember { mutableStateOf<UUID?>(null) }
+                var activeMouseButtonId by remember { mutableStateOf<UUID?>(null) }
+                // The mouse button a viewport press currently emits. Defaults to left; an active Mouse Button element overrides it.
+                val mouseButtonOverride = remember { mutableStateOf(GmlMouseButton.LEFT_BUTTON) }
                 // Hoisted so the in-game Settings switch reflects (and persists) the live runner flag.
                 var widescreenHackEnabled by remember { mutableStateOf(entry.enableWidescreenHack) }
                 var editorState by remember { mutableStateOf<GamepadEditorState?>(null) }
@@ -169,6 +173,7 @@ class GameActivity : ComponentActivity() {
                     butterscotchRunner.paused.value = isPaused
                     // We also reset the fast forward speed to avoid a fast forward button being deleted while it is still active
                     fastForwardActiveButtonId = null
+                    activeMouseButtonId = null
                 }
 
                 // Toggling edit mode drops any held keys so a press in flight does not stick.
@@ -194,13 +199,21 @@ class GameActivity : ComponentActivity() {
                             modifier = modifier.onSizeChanged {
                                 butterscotchRunner.setGameSurfaceSize(it)
                             }.pointerInput(Unit) {
+                                val buttonForPointer = mutableMapOf<PointerId, GmlMouseButton>()
                                 awaitPointerEventScope {
                                     while (true) {
                                         val event = awaitPointerEvent()
 
                                         for (change in event.changes) {
                                             if (change.pressed != change.previousPressed) {
-                                                butterscotchRunner.onMouseButton(GmlMouseButton.LEFT_BUTTON, change.pressed)
+                                                if (change.pressed) {
+                                                    val button = mouseButtonOverride.value
+                                                    buttonForPointer[change.id] = button
+                                                    butterscotchRunner.onMouseButton(button, true)
+                                                } else {
+                                                    val button = buttonForPointer.remove(change.id) ?: GmlMouseButton.LEFT_BUTTON
+                                                    butterscotchRunner.onMouseButton(button, false)
+                                                }
                                             }
 
                                             val position = change.position
@@ -327,6 +340,24 @@ class GameActivity : ComponentActivity() {
                             }
                         }
 
+                        val onMouseButtonPress = { it: GamepadElement.MouseButton ->
+                            performHaptic()
+                            if (it.toggle && activeMouseButtonId == it.id) {
+                                activeMouseButtonId = null
+                            } else {
+                                activeMouseButtonId = it.id
+                            }
+                        }
+                        val onMouseButtonRelease = { it: GamepadElement.MouseButton ->
+                            if (activeMouseButtonId == it.id)
+                                activeMouseButtonId = null
+                        }
+
+                        LaunchedEffect(activeMouseButtonId) {
+                            val element = layout.elements.firstOrNull { it.id == activeMouseButtonId } as GamepadElement.MouseButton?
+                            mouseButtonOverride.value = element?.button ?: GmlMouseButton.LEFT_BUTTON
+                        }
+
                         when (layoutMode) {
                             LayoutMode.Overlay -> {
                                 Box(Modifier.fillMaxSize()) {
@@ -346,12 +377,15 @@ class GameActivity : ComponentActivity() {
                                             layout = layout,
                                             editModeState = editorState,
                                             activeFastForwardButtonId = fastForwardActiveButtonId,
+                                            activeMouseButtonId = activeMouseButtonId,
                                             onMenuOpen = {
                                                 performHaptic()
                                                 menuOpen = true
                                             },
                                             onFastForwardPress = onFastForwardPress,
                                             onFastForwardRelease = onFastForwardRelease,
+                                            onMouseButtonPress = onMouseButtonPress,
+                                            onMouseButtonRelease = onMouseButtonRelease,
                                             keys = keys,
                                             modifier = Modifier.fillMaxSize()
                                         )
@@ -383,12 +417,15 @@ class GameActivity : ComponentActivity() {
                                             layout = layout,
                                             editModeState = editorState,
                                             activeFastForwardButtonId = fastForwardActiveButtonId,
+                                            activeMouseButtonId = activeMouseButtonId,
                                             onMenuOpen = {
                                                 performHaptic()
                                                 menuOpen = true
                                             },
                                             onFastForwardPress = onFastForwardPress,
                                             onFastForwardRelease = onFastForwardRelease,
+                                            onMouseButtonPress = onMouseButtonPress,
+                                            onMouseButtonRelease = onMouseButtonRelease,
                                             keys = keys,
                                             modifier = Modifier
                                                 .fillMaxWidth()
