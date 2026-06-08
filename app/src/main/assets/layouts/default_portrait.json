@@ -56,7 +56,7 @@
             },
             "binding": {
                 "type": "Keyboard",
-                "vk": 90
+                "vk": 88
             }
         },
         {
@@ -72,7 +72,7 @@
             },
             "binding": {
                 "type": "Keyboard",
-                "vk": 88
+                "vk": 90
             }
         },
         {
