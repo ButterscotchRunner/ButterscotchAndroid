@@ -403,7 +403,16 @@ private fun SampleGameTile(
 
                     Spacer(Modifier.height(12.dp))
 
-                    Text("A simple Sokoban-like game")
+                    val paragraphs = entry.description
+                        .split(Regex("\\n\\s*\\n"))   // blank line(s) separate paragraphs
+                        .map { it.trim() }
+                        .filter { it.isNotEmpty() }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for (paragraph in paragraphs) {
+                            Text(paragraph, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
 
                     Spacer(Modifier.height(12.dp))
 

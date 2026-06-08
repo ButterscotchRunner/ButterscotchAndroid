@@ -28,6 +28,7 @@ class SampleGamesRoute(val m: Mizzle) : APIv1Route("/samples") {
                         SampleGamesResponse.Game(
                             it[SampleGames.slug],
                             it[SampleGames.name],
+                            it[SampleGames.description],
                             it[SampleGames.version],
                             it[SampleGames.author]
                         )
