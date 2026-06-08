@@ -34,13 +34,21 @@ void main() {
     color.g = texture(uTexture, uv).g;
     color.b = texture(uTexture, uv - vec2(aberration, 0.0)).b;
 
-    // Scanlines locked to PHYSICAL pixels (not game pixels) so a 640x480 game and an HD game look equally CRT-ish
+    // The sampled texels are sRGB encoded, but the beam/scanline/mask math models actual light intensity, so do it in linear space
+    // Multiplying scanlines straight onto sRGB values crushes the midtones and reads muddy, working in linear keeps it looking lit from behind
+    color = pow(color, vec3(2.2));
+
+    // Linear luminance, used to bloom the scanlines: a real beam fattens in bright areas so the lines nearly vanish in highlights
+    float lum = dot(color, vec3(0.2126, 0.7152, 0.0722));
+
+    // Scanlines derived from the CURVED uv so they bow with the glass, with the count tied to resolution so density is consistent across devices
     // fract keeps the sin argument tiny, dodging mobile GPU large argument precision loss on tall screens
-    // A wider period plus a sharpened (pow) dark band keeps the lines visible on dense phone panels instead of averaging out
-    float scanPhase = fract(gl_FragCoord.y / 5.0);
-    float scan = 0.5 + 0.5 * sin(scanPhase * 6.2831853);
-    scan = pow(scan, 2.0);
-    color *= 1.0 - 0.30 * scan;
+    // A sharpened (pow) dark band keeps the lines visible on dense phone panels instead of averaging out
+    float lines = uResolution.y / 5.0;
+    float scanPhase = fract(uv.y * lines);
+    float scan = pow(0.5 + 0.5 * sin(scanPhase * 6.2831853), 2.0);
+    float scanDepth = mix(0.35, 0.08, lum);
+    color *= 1.0 - scanDepth * scan;
 
     // Faint aperture grille columns for a hint of phosphor structure
     float maskPhase = fract(gl_FragCoord.x / 3.0);
@@ -54,6 +62,9 @@ void main() {
 
     // Compensate for the darkening the scanlines, mask and vignette introduce
     color *= 1.18;
+
+    // Back to sRGB for display
+    color = pow(color, vec3(1.0 / 2.2));
 
     fragColor = vec4(color, 1.0);
 }
