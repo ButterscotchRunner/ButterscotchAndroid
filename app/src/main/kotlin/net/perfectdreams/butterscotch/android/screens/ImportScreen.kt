@@ -5,6 +5,10 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -17,11 +21,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -34,6 +41,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
@@ -190,7 +198,7 @@ fun ImportScreen(
                 ImportUIState.SampleList -> {
                     var gameList by remember { mutableStateOf<SampleGamesResponse?>(null) }
                     LaunchedEffect(Unit) {
-                        gameList = ButterscotchUtils.http.get("${BuildConfig.API_BASE_URL}/api/samples").let {
+                        gameList = ButterscotchUtils.http.get("${BuildConfig.API_BASE_URL}/api/v1/samples").let {
                             Json.decodeFromString<SampleGamesResponse>(it.bodyAsText())
                         }
                     }
@@ -352,8 +360,11 @@ private fun SampleGameTile(
     entry: SampleGamesResponse.Game,
     onSelect: () -> Unit
 ) {
+    var expanded by remember { mutableStateOf(false) }
+    val chevronRotation by animateFloatAsState(if (expanded) 180f else 0f)
+
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.clickable(onClick = onSelect).padding(16.dp)) {
+        Column(modifier = Modifier.clickable { expanded = !expanded }.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Row(
                     modifier = Modifier
@@ -370,15 +381,35 @@ private fun SampleGameTile(
                         )
                     }
                 }
+
+                Icon(
+                    imageVector = Icons.Filled.ExpandMore,
+                    contentDescription = if (expanded) "Collapse" else "Expand",
+                    modifier = Modifier.rotate(chevronRotation),
+                )
             }
 
-            Spacer(Modifier.height(12.dp))
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically(),
+                exit = shrinkVertically(),
+            ) {
+                Column {
+                    Spacer(Modifier.height(12.dp))
 
-            HorizontalDivider()
+                    HorizontalDivider()
 
-            Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(12.dp))
 
-            Text("A simple Sokoban-like game")
+                    Text("A simple Sokoban-like game")
+
+                    Spacer(Modifier.height(12.dp))
+
+                    Button(onClick = onSelect, modifier = Modifier.align(Alignment.End)) {
+                        Text("Import")
+                    }
+                }
+            }
         }
     }
 }
