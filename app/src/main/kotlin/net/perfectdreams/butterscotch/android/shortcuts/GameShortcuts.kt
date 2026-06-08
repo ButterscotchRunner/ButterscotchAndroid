@@ -34,8 +34,10 @@ fun requestPinGameShortcut(context: Context, library: GameLibrary, entry: GameEn
     }
 
     val info = ShortcutInfoCompat.Builder(context, "game-${entry.id}")
-        .setShortLabel(entry.title.take(10))
-        .setLongLabel(entry.title.take(25))
+        // Yes TECHNICALLY it would be better to not do it like that because it recommends 10 and 25 characters...
+        // But launchers shorten it automatically, and at least in my experience the Samsung launcher can display way more than just 10 characters
+        .setShortLabel(entry.title)
+        .setLongLabel(entry.title)
         .setIcon(icon)
         .setIntent(launchIntent)
         .build()
