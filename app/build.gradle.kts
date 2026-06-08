@@ -70,7 +70,7 @@ android {
     buildTypes {
         release {
             buildConfigField("boolean", "FORCE_BUTTERSCOTCH_PLUS", "false")
-            buildConfigField("String", "API_BASE_URL", "\"https://butterscotch.perfectdreams.net\"")
+            buildConfigField("String", "API_BASE_URL", "\"https://mizzle.butterscotch.gg\"")
             buildConfigField("String", "API_VERSION", "\"v1\"")
 
             isMinifyEnabled = true

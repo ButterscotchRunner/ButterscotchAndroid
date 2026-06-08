@@ -10,6 +10,7 @@ dependencies {
     implementation(project(":common"))
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
     implementation("io.ktor:ktor-server-netty:3.5.0")
+    implementation("io.ktor:ktor-client-java:3.5.0")
     implementation("ch.qos.logback:logback-classic:1.5.34")
 
     implementation("org.jetbrains.exposed:exposed-core:1.3.0")

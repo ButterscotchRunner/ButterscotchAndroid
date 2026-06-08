@@ -6,3 +6,11 @@ plugins {
     kotlin("jvm") version "2.2.10" apply false
     kotlin("multiplatform") version "2.2.10" apply false
 }
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven("https://repo.perfectdreams.net/")
+    }
+}
