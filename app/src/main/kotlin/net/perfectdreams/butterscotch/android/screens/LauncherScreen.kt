@@ -51,6 +51,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import androidx.navigation.NavHostController
 import net.perfectdreams.butterscotch.android.GameActivity
@@ -211,7 +212,7 @@ private fun GameTile(
             ) {
                 GameIcon(library, entry, modifier = Modifier.size(42.dp))
                 Column(modifier = Modifier.padding(start = 12.dp)) {
-                    Text(entry.title, style = MaterialTheme.typography.titleMedium)
+                    Text(entry.title, style = MaterialTheme.typography.titleMedium.copy(lineHeight = 20.sp))
                     Text(
                         when (entry.gameType) {
                             is GameEntry.GameType.GameMakerStudio -> "GM:S (WAD Version ${entry.gameType.wadVersion})"

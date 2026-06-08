@@ -49,6 +49,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsBytes
@@ -376,7 +377,7 @@ private fun SampleGameTile(
                     SampleGameIcon(entry, modifier = Modifier.size(42.dp))
 
                     Column(modifier = Modifier.padding(start = 12.dp)) {
-                        Text(entry.name, style = MaterialTheme.typography.titleMedium)
+                        Text(entry.name, style = MaterialTheme.typography.titleMedium.copy(lineHeight = 20.sp))
                         Text(
                             entry.author,
                             style = MaterialTheme.typography.bodySmall
