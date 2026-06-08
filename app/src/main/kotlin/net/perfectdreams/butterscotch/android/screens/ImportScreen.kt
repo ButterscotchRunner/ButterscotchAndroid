@@ -263,9 +263,11 @@ private fun IntroPane(onSelectFolder: () -> Unit, onSelectZip: () -> Unit, onSel
         Button(onClick = onSelectZip) {
             Text("Import ZIP")
         }
-        Spacer(Modifier.height(12.dp))
-        Button(onClick = onSelectSample) {
-            Text("Import Sample")
+        if (BuildConfig.DEBUG) {
+            Spacer(Modifier.height(12.dp))
+            Button(onClick = onSelectSample) {
+                Text("Import Sample")
+            }
         }
     }
 }
