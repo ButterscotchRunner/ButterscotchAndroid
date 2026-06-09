@@ -22,8 +22,6 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -231,14 +229,6 @@ class GameActivity : ComponentActivity() {
                             },
                             factory = { ctx ->
                                 SurfaceView(ctx).apply {
-                                    // setFixedSize requests the buffer resolution, the compositor scales it to the View.
-                                    if (targetOperatingSystemDisplaySize != null) {
-                                        holder.setFixedSize(
-                                            targetOperatingSystemDisplaySize.width,
-                                            targetOperatingSystemDisplaySize.height
-                                        )
-                                    }
-
                                     holder.addCallback(object : SurfaceHolder.Callback {
                                         override fun surfaceCreated(holder: SurfaceHolder) {
                                             butterscotchRunner.startRenderLoop(holder.surface)
@@ -368,21 +358,7 @@ class GameActivity : ComponentActivity() {
                         when (layoutMode) {
                             LayoutMode.Overlay -> {
                                 Box(Modifier.fillMaxSize()) {
-                                    val gameSurfaceModifier = if (freeCam.active || widescreenHackEnabled)
-                                        Modifier.fillMaxSize() // Fill the whole screen!
-                                    else
-                                        Modifier
-                                            .aspectRatio(contentAspect)
-                                            .let {
-                                                if (contentAspect >= 1.0) {
-                                                    it.fillMaxWidth()
-                                                } else {
-                                                    it.fillMaxHeight()
-                                                }
-                                            }
-                                            .align(Alignment.Center)
-
-                                    gameSurface(gameSurfaceModifier)
+                                    gameSurface(Modifier.fillMaxSize())
                                     if (!freeCam.active) {
                                         GameControls(
                                             layout = layout,
@@ -412,14 +388,7 @@ class GameActivity : ComponentActivity() {
                                             .weight(1f),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        gameSurface(
-                                            if (freeCam.active || widescreenHackEnabled)
-                                                Modifier.fillMaxSize() // Fill the whole screen!
-                                            else
-                                                Modifier
-                                                    .fillMaxWidth()
-                                                    .aspectRatio(contentAspect)
-                                        )
+                                        gameSurface(Modifier.fillMaxSize())
                                     }
 
                                     if (!freeCam.active) {

@@ -58,6 +58,10 @@ class ButterscotchDroidRunner(val assets: AssetManager, val dataWinPath: String,
     var blitTextureId: Int = 0
     private var fboWidth: Int = 0
     private var fboHeight: Int = 0
+    private var renderW: Int = 1
+    private var renderH: Int = 1
+    private var renderX: Int = 0
+    private var renderY: Int = 0
     val shaderManager = ShaderManager()
     lateinit var crtShader: CrtShader
     lateinit var blitShader: BlitShader
@@ -133,12 +137,13 @@ class ButterscotchDroidRunner(val assets: AssetManager, val dataWinPath: String,
                     val deltaTimeSeconds = ((frameStartNs - lastFrameStartNs) / 1_000_000_000.0).toFloat()
                     lastFrameStartNs = frameStartNs
 
-                    // Resize the host framebuffer before stepAndDraw, which is where the runner blits into it
+                    // Size the host framebuffer to the game (so the runner fills it edge to edge, no native letterboxing) before stepAndDraw blits into it
+                    computeRenderTarget()
                     ensureFramebufferSize()
 
                     ButterscotchNative.beginFrame()
                     drainPendingInput()
-                    val stepStatus = ButterscotchNative.stepAndDraw(egl.width, egl.height, deltaTimeSeconds)
+                    val stepStatus = ButterscotchNative.stepAndDraw(renderW, renderH, deltaTimeSeconds)
 
                     when (stepStatus) {
                         ButterscotchNative.BUTTERSCOTCH_DROID_CONTINUE,
@@ -154,6 +159,11 @@ class ButterscotchDroidRunner(val assets: AssetManager, val dataWinPath: String,
                                 GLES20.glDisable(GLES20.GL_BLEND)
                                 GLES20.glDisable(GLES20.GL_SCISSOR_TEST)
 
+                                // Clear the whole surface to black, then draw the game into its letterbox rect so post-processing only touches the game pixels
+                                GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
+                                GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+                                GLES20.glViewport(renderX, renderY, renderW, renderH)
+
                                 GLES30.glBindVertexArray(0)
                                 when (postProcessing.shader) {
                                     GameEntry.PostProcessingShader.OFF -> blitShader.bind {
@@ -161,7 +171,7 @@ class ButterscotchDroidRunner(val assets: AssetManager, val dataWinPath: String,
                                     }
                                     GameEntry.PostProcessingShader.CRT -> crtShader.bind {
                                         uTexture.set(GLES20.GL_TEXTURE0, this@ButterscotchDroidRunner.blitTextureId)
-                                        uResolution.set(egl.width.toFloat(), egl.height.toFloat())
+                                        uResolution.set(renderW.toFloat(), renderH.toFloat())
                                         val crt = postProcessing.crt
                                         uCurvature.set(crt.curvature.toFloat())
                                         uAberration.set(crt.aberration.toFloat())
@@ -329,7 +339,12 @@ class ButterscotchDroidRunner(val assets: AssetManager, val dataWinPath: String,
                 is InputEvent.GamepadAxis -> ButterscotchNative.gamepadAxis(event.device, event.axis, event.value)
                 is InputEvent.GamepadConnected -> ButterscotchNative.gamepadConnected(event.device, event.name)
                 is InputEvent.GamepadDisconnected -> ButterscotchNative.gamepadDisconnected(event.device)
-                is InputEvent.MousePosition -> ButterscotchNative.setNormalizedCursorPosition(event.x, event.y)
+                is InputEvent.MousePosition -> {
+                    // event.x/y are fractions of the full surface; remap them into the game's letterbox rect
+                    val gameX = if (renderW > 0) (event.x * egl.width - renderX) / renderW else event.x
+                    val gameY = if (renderH > 0) (event.y * egl.height - renderY) / renderH else event.y
+                    ButterscotchNative.setNormalizedCursorPosition(gameX, gameY)
+                }
                 is InputEvent.MouseButton -> ButterscotchNative.setMouseButtonState(event.button.id, event.isDown)
             }
         }
@@ -351,7 +366,8 @@ class ButterscotchDroidRunner(val assets: AssetManager, val dataWinPath: String,
         GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fboId)
         GLES20.glFramebufferTexture2D(GLES20.GL_FRAMEBUFFER, GLES20.GL_COLOR_ATTACHMENT0, GLES20.GL_TEXTURE_2D, blitTextureId, 0)
 
-        // Allocate the color attachment storage at the current surface size
+        // Allocate the color attachment storage at the current render size
+        computeRenderTarget()
         ensureFramebufferSize()
 
         val status = GLES20.glCheckFramebufferStatus(GLES20.GL_FRAMEBUFFER)
@@ -367,15 +383,43 @@ class ButterscotchDroidRunner(val assets: AssetManager, val dataWinPath: String,
         blitShader = shaderManager.loadShader(crtVertexShader, blitFragmentShader) { BlitShader(it) }
     }
 
-    // Reallocate the host framebuffer color texture when the surface size changes, otherwise the runner letterbox blits into a stale sized texture after a rotation
+    // Pick the game's render size and on-screen letterbox rect. The host framebuffer is sized to the render size and the runner fills it edge to edge, so the letterboxing happens later in our own present blit instead of inside the runner.
+    private fun computeRenderTarget() {
+        val surfaceW = egl.width
+        val surfaceH = egl.height
+        val gameSize = ButterscotchNative.currentGameSize
+
+        // Widescreen hack and free camera want the full surface; before the game reports its size we have no aspect to fit, so also fall back to the full surface
+        if (enableWidescreenHack || freeCamera.value.active || gameSize == null || 0 >= gameSize.width || 0 >= gameSize.height) {
+            renderW = surfaceW
+            renderH = surfaceH
+            renderX = 0
+            renderY = 0
+            return
+        }
+
+        val gameW = gameSize.width
+        val gameH = gameSize.height
+        if (surfaceW > gameW * surfaceH / gameH) {
+            renderW = (gameW * surfaceH / gameH).coerceAtLeast(1)
+            renderH = surfaceH
+        } else {
+            renderW = surfaceW
+            renderH = (gameH * surfaceW / gameW).coerceAtLeast(1)
+        }
+        renderX = (surfaceW - renderW) / 2
+        renderY = (surfaceH - renderH) / 2
+    }
+
+    // Reallocate the host framebuffer color texture when the render size changes, otherwise the runner blits into a stale sized texture after a rotation or a game size change
     // The texture id and the framebuffer attachment stay valid across the reallocation, so nothing needs re-attaching
     private fun ensureFramebufferSize() {
-        if (egl.width == fboWidth && egl.height == fboHeight)
+        if (renderW == fboWidth && renderH == fboHeight)
             return
 
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, blitTextureId)
-        GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA, egl.width, egl.height, 0, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, null)
-        fboWidth = egl.width
-        fboHeight = egl.height
+        GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA, renderW, renderH, 0, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, null)
+        fboWidth = renderW
+        fboHeight = renderH
     }
 }
