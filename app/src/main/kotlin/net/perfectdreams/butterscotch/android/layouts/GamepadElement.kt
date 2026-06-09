@@ -2,7 +2,7 @@ package net.perfectdreams.butterscotch.android.layouts
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import net.perfectdreams.butterscotch.android.UUIDAsStringSerializer
+import net.perfectdreams.butterscotch.UUIDAsStringSerializer
 import java.util.UUID
 
 @Serializable

@@ -15,6 +15,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.google.android.gms.ads.MobileAds
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import net.perfectdreams.butterscotch.android.billing.BillingManager
 import net.perfectdreams.butterscotch.android.theme.ButterscotchAndroidTheme
 import java.util.UUID
@@ -35,6 +37,8 @@ class MainActivity : ComponentActivity() {
         if (!billing.isPlus) {
             MobileAds.initialize(this.applicationContext)
         }
+
+        ButterscotchUtils.fireAppLaunchEvent(this)
 
         if (intent?.action == ACTION_LAUNCH_GAME) {
             val gameIdAsString = intent.getStringExtra(GameActivity.EXTRA_GAME_ID)

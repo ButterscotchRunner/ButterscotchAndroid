@@ -3,7 +3,7 @@ package net.perfectdreams.butterscotch.android.library
 import androidx.compose.ui.unit.IntSize
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import net.perfectdreams.butterscotch.android.UUIDAsStringSerializer
+import net.perfectdreams.butterscotch.UUIDAsStringSerializer
 import net.perfectdreams.butterscotch.android.layouts.LayoutLibrary
 import java.util.UUID
 
