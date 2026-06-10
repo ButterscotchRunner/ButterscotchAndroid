@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.imageResource
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
@@ -81,6 +82,13 @@ fun AboutScreen(nav: NavHostController) {
             )
 
             Text("Butterscotch", style = MaterialTheme.typography.headlineMedium)
+
+            Spacer(Modifier.height(4.dp))
+
+            Text("\"Finally... Droidtale 2\"", style = MaterialTheme.typography.headlineSmall.copy(fontStyle = FontStyle.Italic))
+
+            Spacer(Modifier.height(16.dp))
+
             Text("Created by MrPowerGamerBR", style = MaterialTheme.typography.bodyLarge)
 
             Spacer(Modifier.height(24.dp))
