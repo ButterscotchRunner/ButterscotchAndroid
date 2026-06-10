@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
@@ -61,7 +62,13 @@ class MainActivity : ComponentActivity() {
             // Unknown/stale id: fall through to the normal launcher UI.
         }
 
-        enableEdgeToEdge()
+        enableEdgeToEdge(
+            // Make the button background not LIGHT
+            navigationBarStyle = SystemBarStyle.dark(
+                scrim = android.graphics.Color.TRANSPARENT
+            )
+        )
+
         setContent {
             ButterscotchAndroidTheme {
                 var splashGone by rememberSaveable { mutableStateOf(false) }
