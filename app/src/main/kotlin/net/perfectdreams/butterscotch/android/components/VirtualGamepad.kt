@@ -125,19 +125,12 @@ fun BoxWithConstraintsScope.placementOf(element: GamepadElement): Modifier {
         .size(sizeDp)
 }
 
-// Fallback label for a Key whose label is null. Keyboard letters/digits show their glyph; arrows
-// show an arrow symbol; anything else falls back to its raw code. Gamepad buttons have no natural
-// glyph, so they show a placeholder until we have real button artwork.
+// Fallback label for a Key whose label is null. Keyboard keys use GmlKey's short label (letters and
+// digits are their glyph, arrows are arrow symbols, modifiers are text like "Shift"/"Ctrl"); vk codes
+// outside GmlKey fall back to the raw code. Gamepad buttons have no natural glyph, so they show a
+// placeholder until we have real button artwork.
 fun defaultLabelFor(binding: InputBinding): String = when (binding) {
-    is InputBinding.Keyboard -> when (binding.vk) {
-        in 48..57, in 65..90 -> binding.vk.toChar().toString() // 0-9, A-Z (ASCII)
-        GmlKey.LEFT.code -> "←"
-        GmlKey.UP.code -> "↑"
-        GmlKey.RIGHT.code -> "→"
-        GmlKey.DOWN.code -> "↓"
-        GmlKey.SPACE.code -> "␣"
-        else -> binding.vk.toString()
-    }
+    is InputBinding.Keyboard -> GmlKey.fromCode(binding.vk)?.shortLabel ?: binding.vk.toString()
     is InputBinding.GamepadButton -> Gamepad.Button.fromIndex(binding.button)?.shortLabel ?: "B${binding.button}"
 }
 

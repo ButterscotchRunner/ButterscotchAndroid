@@ -309,7 +309,9 @@ fun ActionButton(
             Text(
                 text = label,
                 color = Color.White,
-                style = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                // Text labels like "Shift"/"Enter" overflow a small round button at the glyph size, so step down for anything longer than 2 chars
+                style = TextStyle(fontSize = if (label.length > 2) 13.sp else 22.sp, fontWeight = FontWeight.Bold),
+                maxLines = 1
             )
         }
     }
