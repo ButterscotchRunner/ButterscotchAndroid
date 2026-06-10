@@ -3,6 +3,7 @@ package net.perfectdreams.butterscotch.android.screens
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -204,8 +205,13 @@ fun ImportScreen(
                 ImportUIState.SampleList -> {
                     var gameList by remember { mutableStateOf<SampleGamesResponse?>(null) }
                     LaunchedEffect(Unit) {
-                        gameList = ButterscotchUtils.http.get("${BuildConfig.API_BASE_URL}/api/v1/samples").let {
-                            Json.decodeFromString<SampleGamesResponse>(it.bodyAsText())
+                        try {
+                            gameList = ButterscotchUtils.http.get("${BuildConfig.API_BASE_URL}/api/v1/samples").let {
+                                Json.decodeFromString<SampleGamesResponse>(it.bodyAsText())
+                            }
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Failed to connect to server!", Toast.LENGTH_SHORT).show()
+                            state = ImportUIState.Intro
                         }
                     }
 
@@ -219,14 +225,19 @@ fun ImportScreen(
                                     val copyingState = ImportUIState.Copying()
                                     state = copyingState
                                     scope.launch {
-                                        val zipAsBytes = ButterscotchUtils.http.get("/samples/${game.slug}/${game.version}/game.zip").bodyAsBytes()
-                                        val iconAsBytes = ButterscotchUtils.http.get("/samples/${game.slug}/${game.version}/icon.png").bodyAsBytes()
-                                        state = when (val result = GameImporter.importZip(library, zipAsBytes, game.name, iconAsBytes) { copyingState.currentFile = it }) {
-                                            is GameImporter.Result.Success -> ImportUIState.Configure(result)
-                                            is GameImporter.Result.MissingWad -> ImportUIState.Error(
-                                                "Missing WAD in ZIP!\n\nExpected one of: ${GameImporter.WAD_FILENAMES.joinToString(", ")}"
-                                            )
-                                            is GameImporter.Result.Failure -> ImportUIState.Error(result.message)
+                                        try {
+                                            val zipAsBytes = ButterscotchUtils.http.get("/samples/${game.slug}/${game.version}/game.zip").bodyAsBytes()
+                                            val iconAsBytes = ButterscotchUtils.http.get("/samples/${game.slug}/${game.version}/icon.png").bodyAsBytes()
+                                            state = when (val result = GameImporter.importZip(library, zipAsBytes, game.name, iconAsBytes) { copyingState.currentFile = it }) {
+                                                is GameImporter.Result.Success -> ImportUIState.Configure(result)
+                                                is GameImporter.Result.MissingWad -> ImportUIState.Error(
+                                                    "Missing WAD in ZIP!\n\nExpected one of: ${GameImporter.WAD_FILENAMES.joinToString(", ")}"
+                                                )
+                                                is GameImporter.Result.Failure -> ImportUIState.Error(result.message)
+                                            }
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Failed to connect to server!", Toast.LENGTH_SHORT).show()
+                                            state = ImportUIState.SampleList
                                         }
                                     }
                                 }
@@ -269,11 +280,9 @@ private fun IntroPane(onSelectFolder: () -> Unit, onSelectZip: () -> Unit, onSel
         Button(onClick = onSelectZip) {
             Text("Import ZIP")
         }
-        if (BuildConfig.DEBUG) {
-            Spacer(Modifier.height(12.dp))
-            Button(onClick = onSelectSample) {
-                Text("Import Sample")
-            }
+        Spacer(Modifier.height(12.dp))
+        Button(onClick = onSelectSample) {
+            Text("Import Sample")
         }
     }
 }
@@ -347,9 +356,13 @@ private fun SampleGameIcon(
     var bitmap by remember { mutableStateOf<Bitmap?>(null) }
 
     LaunchedEffect(Unit) {
-        bitmap = ButterscotchUtils.http.get("/samples/${entry.slug}/${entry.version}/icon.png")
-            .bodyAsBytes()
-            .let { BitmapFactory.decodeByteArray(it, 0, it.size) }
+        try {
+            bitmap = ButterscotchUtils.http.get("/samples/${entry.slug}/${entry.version}/icon.png")
+                .bodyAsBytes()
+                .let { BitmapFactory.decodeByteArray(it, 0, it.size) }
+        } catch (e: Exception) {
+            // Keep the icon empty, the list itself already shows a toast if the server is unreachable
+        }
     }
 
     val _bitmap = bitmap

@@ -1,0 +1,37 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  DOCKER_USERNAME: "${{ github.actor }}"
+  DOCKER_PASSWORD: "${{ secrets.GITHUB_TOKEN }}"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "25"
+          cache: "gradle"
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build with Gradle and create Docker image
+        run: ./gradlew :backend:build :backend:jibDockerBuild
+
+      - name: Login and publish Docker image
+        run: |
+          docker login --username $DOCKER_USERNAME --password $DOCKER_PASSWORD ghcr.io
+          docker push ghcr.io/butterscotchrunner/mizzle:latest

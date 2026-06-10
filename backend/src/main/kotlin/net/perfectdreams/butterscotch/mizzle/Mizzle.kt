@@ -14,6 +14,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
+import net.perfectdreams.butterscotch.mizzle.config.MizzleConfig
 import net.perfectdreams.butterscotch.mizzle.routes.v1.PostAndroidAnalyticsLaunchAppRoute
 import net.perfectdreams.butterscotch.mizzle.routes.v1.PostAndroidAnalyticsLaunchGameRoute
 import net.perfectdreams.butterscotch.mizzle.routes.v1.SampleGamesRoute
@@ -48,7 +49,7 @@ import java.util.UUID
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.milliseconds
 
-class Mizzle(val database: Database) {
+class Mizzle(val config: MizzleConfig, val database: Database) {
     val http = HttpClient(Java) {
         expectSuccess = false
     }
@@ -101,7 +102,7 @@ class Mizzle(val database: Database) {
                     }
                 }
 
-                staticFiles("/samples", File("/home/mrpowergamerbr/Projects/ButterscotchAndroid/samples"))
+                staticFiles("/samples", File(config.samplesPath))
             }
         }
         server.start(wait = true)

@@ -1,10 +1,15 @@
 package net.perfectdreams.butterscotch.mizzle
 
+import com.typesafe.config.ConfigFactory
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import com.zaxxer.hikari.util.IsolationLevel
+import kotlinx.serialization.hocon.Hocon
+import kotlinx.serialization.hocon.decodeFromConfig
+import net.perfectdreams.butterscotch.mizzle.config.MizzleConfig
 import org.jetbrains.exposed.v1.core.DatabaseConfig
 import org.jetbrains.exposed.v1.jdbc.Database
+import java.io.File
 
 object MizzleLauncher {
     private val DRIVER_CLASS_NAME = "org.postgresql.Driver"
@@ -12,15 +17,18 @@ object MizzleLauncher {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        val hikariConfig = createHikariConfig() {}
-        hikariConfig.jdbcUrl = "jdbc:postgresql://127.0.0.1/mizzle"
+        val config = Hocon.decodeFromConfig<MizzleConfig>(ConfigFactory.parseFile(File("mizzle.conf")))
 
-        hikariConfig.username = "postgres"
-        hikariConfig.password = "postgres"
+        val hikariConfig = createHikariConfig {}
+        hikariConfig.jdbcUrl = "jdbc:postgresql://${config.database.address}/${config.database.database}"
+
+        hikariConfig.username = config.database.username
+        hikariConfig.password = config.database.password
 
         val hikariDataSource = HikariDataSource(hikariConfig)
 
         val m = Mizzle(
+            config,
             Database.connect(
                 hikariDataSource,
                 databaseConfig = DatabaseConfig {
