@@ -560,7 +560,7 @@ private fun SettingsOverlay(
                 // Same colors as ButterscotchTopBar, which we can't use directly here because it
                 // wants a NavHostController and GameActivity has no Compose navigation
                 TopAppBar(
-                    title = { Text("Settings") },
+                    title = { Text("Game Settings") },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.primary,
                         titleContentColor = MaterialTheme.colorScheme.onPrimary,
