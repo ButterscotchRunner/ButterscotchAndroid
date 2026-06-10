@@ -35,6 +35,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -74,6 +75,8 @@ import net.perfectdreams.butterscotch.android.layouts.GamepadLayout
 import net.perfectdreams.butterscotch.android.layouts.GmlKey
 import net.perfectdreams.butterscotch.android.layouts.InputBinding
 import net.perfectdreams.butterscotch.android.library.GameEntry
+import net.perfectdreams.butterscotch.android.screens.GameLogContent
+import java.io.File
 
 /**
  * Just the on-screen gameplay controls (joystick + action buttons), no menu. Renders into whatever
@@ -245,6 +248,7 @@ fun MenuOverlay(
     onToggleWidescreenHack: (Boolean) -> Unit,
     postProcessing: GameEntry.PostProcessingSettings,
     onChangePostProcessing: (GameEntry.PostProcessingSettings) -> Unit,
+    logsDir: File,
     modifier: Modifier = Modifier
 ) {
     // Back button: if the menu is open, close it. Otherwise open it. Same toggle the hamburger does.
@@ -272,7 +276,8 @@ fun MenuOverlay(
             widescreenHackEnabled = widescreenHackEnabled,
             onToggleWidescreenHack = onToggleWidescreenHack,
             postProcessing = postProcessing,
-            onChangePostProcessing = onChangePostProcessing
+            onChangePostProcessing = onChangePostProcessing,
+            logsDir = logsDir
         )
     }
 }
@@ -305,10 +310,12 @@ private fun BoxScope.MenuSidebar(
     widescreenHackEnabled: Boolean,
     onToggleWidescreenHack: (Boolean) -> Unit,
     postProcessing: GameEntry.PostProcessingSettings,
-    onChangePostProcessing: (GameEntry.PostProcessingSettings) -> Unit
+    onChangePostProcessing: (GameEntry.PostProcessingSettings) -> Unit,
+    logsDir: File
 ) {
     var isRoomWarpMenuOpen by remember { mutableStateOf(false) }
     var isSettingsOpen by remember { mutableStateOf(false) }
+    var isLogsOpen by remember { mutableStateOf(false) }
 
     if (isRoomWarpMenuOpen) {
         var roomNameFilter by remember { mutableStateOf("") }
@@ -460,6 +467,10 @@ private fun BoxScope.MenuSidebar(
                     onExitGame()
                 })
 
+                MenuItem(label = "Logs", onClick = {
+                    isLogsOpen = true
+                })
+
                 Text(
                     text = "Virtual Gamepad",
                     color = MaterialTheme.colorScheme.primary,
@@ -508,6 +519,12 @@ private fun BoxScope.MenuSidebar(
         postProcessing = postProcessing,
         onChangePostProcessing = onChangePostProcessing
     )
+
+    LogsOverlay(
+        open = isLogsOpen,
+        onDismiss = { isLogsOpen = false },
+        logsDir = logsDir
+    )
 }
 
 /**
@@ -518,7 +535,7 @@ private fun BoxScope.MenuSidebar(
  * while it's open, and a separate activity can't happen because the runner state is process-local
  * and tied to this activity's surface.
  */
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SettingsOverlay(
     open: Boolean,
@@ -619,6 +636,58 @@ private fun SettingsOverlay(
                     onChange = onChangePostProcessing,
                 )
             }
+        }
+    }
+}
+
+/**
+ * In-game log viewer as a full screen Scaffold, same in-hierarchy approach as [SettingsOverlay]
+ * (see its KDoc for why this is not a Dialog or a separate activity).
+ *
+ * The content lives inside AnimatedVisibility, so it leaves composition on close and rereads the
+ * log file on every open.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LogsOverlay(
+    open: Boolean,
+    onDismiss: () -> Unit,
+    logsDir: File
+) {
+    // Registered after MenuOverlay's always-on BackHandler, and later-registered enabled handlers
+    // win, so while the screen is open back closes it instead of toggling the menu
+    BackHandler(enabled = open) {
+        onDismiss()
+    }
+
+    AnimatedVisibility(
+        visible = open,
+        enter = slideInHorizontally(initialOffsetX = { it }),
+        exit = slideOutHorizontally(targetOffsetX = { it }),
+        modifier = Modifier.fillMaxSize()
+    ) {
+        // Scaffold is backed by a Surface, so it also blocks touches from falling through to the
+        // game and the virtual gamepad controls underneath
+        Scaffold(
+            topBar = {
+                // Same colors as ButterscotchTopBar, which we can't use directly here because it
+                // wants a NavHostController and GameActivity has no Compose navigation
+                TopAppBar(
+                    title = { Text("Game Logs") },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
+                    navigationIcon = {
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    }
+                )
+            }
+        ) { innerPadding ->
+            GameLogContent(logsDir, Modifier.fillMaxSize().padding(innerPadding))
         }
     }
 }

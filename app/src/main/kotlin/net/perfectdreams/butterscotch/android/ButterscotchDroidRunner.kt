@@ -1,12 +1,10 @@
 package net.perfectdreams.butterscotch.android
 
 import android.content.res.AssetManager
-import android.content.res.Resources
 import android.opengl.GLES20
 import android.opengl.GLES30
 import android.util.Log
 import android.view.Surface
-import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.IntSize
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -28,6 +26,7 @@ import net.perfectdreams.butterscotch.android.shaders.BlitShader
 import net.perfectdreams.butterscotch.android.shaders.CrtShader
 import net.perfectdreams.harmony.gl.shaders.ShaderManager
 import net.perfectdreams.harmony.gl.shaders.bind
+import java.io.File
 import java.util.concurrent.Executors
 
 // The Butterscotch Android API is actually "global bound", but we use a class to help managing things here (and will be useful if we refactor down the road)
@@ -36,6 +35,7 @@ class ButterscotchDroidRunner(
     val dataWinPath: String,
     val wadHash: Long,
     val savesPath: String,
+    val logFile: File,
     val osType: Int,
     val enablePhysicalControllers: Boolean,
     val enablePhysicalKeyboard: Boolean,
@@ -44,7 +44,7 @@ class ButterscotchDroidRunner(
     val isPlus: Boolean
 ) {
     companion object {
-        private const val TAG = "ButterscotchRenderLoop"
+        private const val TAG = "ButterscotchDroidRunner"
 
         private val glExec = Executors.newSingleThreadExecutor { Thread(it, "ButterscotchGLRender") }
         private val glDispatcher = glExec.asCoroutineDispatcher()
@@ -76,6 +76,7 @@ class ButterscotchDroidRunner(
     val shaderManager = ShaderManager()
     lateinit var crtShader: CrtShader
     lateinit var blitShader: BlitShader
+    private var stdioCallback: ((String) -> (Unit))? = null
 
     data class FreeCameraState(
         val active: Boolean = false,
@@ -83,6 +84,12 @@ class ButterscotchDroidRunner(
         val panY: Float = 0.0f,
         val zoom: Float = 1.0f
     )
+
+    init {
+        this.stdioCallback = ButterscotchNative.registerStdioListener {
+            this@ButterscotchDroidRunner.logFile.appendText(it + "\n")
+        }
+    }
 
     /**
      * Forward a SurfaceHolder size change to the EGL layer so the next frame renders at the right resolution.
@@ -290,6 +297,7 @@ class ButterscotchDroidRunner(
         renderJob = null
         started = false
         runnerStarted = false
+        stdioCallback?.let { ButterscotchNative.unregisterStdioListener(it) }
     }
 
     sealed interface InputEvent {

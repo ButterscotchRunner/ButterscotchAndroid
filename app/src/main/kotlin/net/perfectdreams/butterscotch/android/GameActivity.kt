@@ -127,11 +127,17 @@ class GameActivity : ComponentActivity() {
         // exit would otherwise immediately finish() us via the LaunchedEffect below.
         ButterscotchNative.resetExitLatch()
 
+        val logsDir = gameLibrary.logsDir(entry)
+        logsDir.mkdirs()
+        val logsFile = File(logsDir, "latest.log")
+        logsFile.delete()
+
         val butterscotchRunner = ButterscotchDroidRunner(
             this.assets,
             wadFile.absolutePath,
             crc32(wadFile),
             savesDir.absolutePath,
+            logsFile,
             entry.runnerOs.nativeValue,
             entry.enablePhysicalControllers,
             entry.enablePhysicalKeyboard,
@@ -462,6 +468,7 @@ class GameActivity : ComponentActivity() {
                                 butterscotchRunner.postProcessing = newSettings
                                 gameLibrary.update(entry.id) { it.copy(postProcessing = newSettings) }
                             },
+                            logsDir = gameLibrary.logsDir(entry.id),
                         )
 
                         // We want this to be on top of the menu

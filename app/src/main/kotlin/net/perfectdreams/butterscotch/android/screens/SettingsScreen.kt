@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.AddToHomeScreen
+import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Save
@@ -103,6 +104,14 @@ fun SettingsScreen(
                         },
                     )
                 }
+            }
+            item("game-logs") {
+                OverviewRow(
+                    icon = Icons.AutoMirrored.Filled.Article,
+                    title = "Game Logs",
+                    subtitle = "View the game logs",
+                    onClick = { nav.navigate(Route.GameLogs(gameId.toString())) },
+                )
             }
             item("delete") {
                 OverviewRow(

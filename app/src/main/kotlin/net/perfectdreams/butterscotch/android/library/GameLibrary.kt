@@ -51,6 +51,9 @@ class GameLibrary private constructor(
 
     fun slotDir(entry: GameEntry, slotId: UUID): File = File(gameDir(entry.id), "saves/$slotId")
 
+    fun logsDir(entry: GameEntry): File = File(gameDir(entry.id), "logs")
+    fun logsDir(entryId: UUID): File = File(gameDir(entryId), "logs")
+
     fun wadPath(entry: GameEntry): File = File(
         bundleDir(entry),
         when (entry.gameType) {
@@ -79,6 +82,7 @@ class GameLibrary private constructor(
         val dir = gameDir(id).apply { mkdirs() }
         File(dir, "bundle").mkdirs()
         File(dir, "saves").mkdirs()
+        File(dir, "logs").mkdirs()
         return StagedGame(id, File(dir, "bundle"), File(dir, "saves"))
     }
 
@@ -154,6 +158,7 @@ class GameLibrary private constructor(
         if (entries.removeAll { it.id == id }) {
             gameDir(id).deleteRecursively()
             assetsDir(id).deleteRecursively()
+            logsDir(id).deleteRecursively()
             save()
         }
     }

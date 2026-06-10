@@ -11,6 +11,7 @@ import net.perfectdreams.butterscotch.android.layouts.LayoutLibrary
 import net.perfectdreams.butterscotch.android.library.GameLibrary
 import net.perfectdreams.butterscotch.android.settings.SettingsStore
 import net.perfectdreams.butterscotch.android.screens.AboutScreen
+import net.perfectdreams.butterscotch.android.screens.GameLogsScreen
 import net.perfectdreams.butterscotch.android.screens.GameSettingsScreen
 import net.perfectdreams.butterscotch.android.screens.GeneralSettingsScreen
 import net.perfectdreams.butterscotch.android.screens.ImportScreen
@@ -91,6 +92,14 @@ fun ButterscotchApp(gameLibrary: GameLibrary, layoutLibrary: LayoutLibrary, sett
                 library = gameLibrary,
                 gameId = UUID.fromString(args.gameId),
                 slotId = args.slotId,
+                nav = nav,
+            )
+        }
+        composable<Route.GameLogs> { backStackEntry ->
+            val args = backStackEntry.toRoute<Route.SaveSlotList>()
+            GameLogsScreen(
+                library = gameLibrary,
+                gameId = UUID.fromString(args.gameId),
                 nav = nav,
             )
         }
