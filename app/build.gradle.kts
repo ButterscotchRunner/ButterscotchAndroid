@@ -31,8 +31,8 @@ android {
         applicationId = "net.perfectdreams.butterscotch"
         minSdk = 24
         targetSdk = 36
-        versionCode = 14
-        versionName = "2026.06.9"
+        versionCode = 16
+        versionName = "2026.06.11"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
