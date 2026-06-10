@@ -1,6 +1,16 @@
 package net.perfectdreams.butterscotch.android.components
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -8,12 +18,19 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -22,6 +39,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -31,16 +51,25 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import net.perfectdreams.butterscotch.android.Libraries
 import net.perfectdreams.butterscotch.android.layouts.Gamepad
 import net.perfectdreams.butterscotch.android.layouts.GamepadElement
 import net.perfectdreams.butterscotch.android.layouts.GamepadStick
@@ -48,6 +77,8 @@ import net.perfectdreams.butterscotch.android.layouts.GmlKey
 import net.perfectdreams.butterscotch.android.layouts.GmlMouseButton
 import net.perfectdreams.butterscotch.android.layouts.InputBinding
 import net.perfectdreams.butterscotch.android.layouts.KeyTrigger
+import net.perfectdreams.butterscotch.android.layouts.LayoutLibrary
+import java.io.ByteArrayOutputStream
 import java.util.UUID
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
@@ -275,6 +306,8 @@ fun BoxWithConstraintsScope.GamepadEditor(state: GamepadEditorState) {
                 right = element.right,
                 keys = state.keys,
                 interactive = false,
+                sprite = element.sprite,
+                spriteThumb = element.spriteThumb,
                 modifier = editModifier
             )
 
@@ -283,6 +316,8 @@ fun BoxWithConstraintsScope.GamepadEditor(state: GamepadEditorState) {
                 device = element.device,
                 keys = state.keys,
                 interactive = false,
+                sprite = element.sprite,
+                spriteThumb = element.spriteThumb,
                 modifier = editModifier
             )
 
@@ -293,11 +328,13 @@ fun BoxWithConstraintsScope.GamepadEditor(state: GamepadEditorState) {
                     element.trigger,
                     state.keys,
                     false,
+                    element.sprite,
+                    element.spritePressed,
                     editModifier
                 )
             }
             is GamepadElement.Menu -> {
-                MenuButton(false, {}, editModifier)
+                MenuButton(false, {}, element.sprite, editModifier)
             }
 
             is GamepadElement.FastForward -> {
@@ -381,12 +418,19 @@ private fun ElementEditDialog(
                 when (element) {
                     // The binding type is fixed at creation ("Button" -> keyboard, "Gamepad Button" ->
                     // gamepad); BindingEditor shows the matching picker for whichever it currently is.
-                    is GamepadElement.Key -> BindingEditor("Button", element.binding) { onChange(element.copy(binding = it)) }
+                    is GamepadElement.Key -> {
+                        BindingEditor("Button", element.binding) { onChange(element.copy(binding = it)) }
+                        // Removing the base sprite also clears the pressed one, a pressed-only sprite makes no sense
+                        SpriteField("Sprite", element.sprite) { onChange(element.copy(sprite = it, spritePressed = if (it == null) null else element.spritePressed)) }
+                        SpriteField("Pressed sprite", element.spritePressed, enabled = element.sprite != null) { onChange(element.copy(spritePressed = it)) }
+                    }
                     is GamepadElement.Joystick -> {
                         VkField("Up", element.up) { onChange(element.copy(up = it)) }
                         VkField("Down", element.down) { onChange(element.copy(down = it)) }
                         VkField("Left", element.left) { onChange(element.copy(left = it)) }
                         VkField("Right", element.right) { onChange(element.copy(right = it)) }
+                        SpriteField("Base sprite", element.sprite) { onChange(element.copy(sprite = it)) }
+                        SpriteField("Thumb sprite", element.spriteThumb) { onChange(element.copy(spriteThumb = it)) }
                     }
                     is GamepadElement.AnalogJoystick -> {
                         SlotField(element.device) { onChange(element.copy(device = it)) }
@@ -401,9 +445,14 @@ private fun ElementEditDialog(
                         }) {
                             Text("Right Stick")
                         }
+
+                        SpriteField("Base sprite", element.sprite) { onChange(element.copy(sprite = it)) }
+                        SpriteField("Thumb sprite", element.spriteThumb) { onChange(element.copy(spriteThumb = it)) }
                     }
 
-                    is GamepadElement.Menu -> {}
+                    is GamepadElement.Menu -> {
+                        SpriteField("Sprite", element.sprite) { onChange(element.copy(sprite = it)) }
+                    }
                     is GamepadElement.FastForward -> {
                         Text(text = element.speed.toString())
 
@@ -434,6 +483,9 @@ private fun ElementEditDialog(
                         }) {
                             Text("Hold")
                         }
+
+                        SpriteField("Sprite", element.sprite) { onChange(element.copy(sprite = it, spritePressed = if (it == null) null else element.spritePressed)) }
+                        SpriteField("Pressed sprite", element.spritePressed, enabled = element.sprite != null) { onChange(element.copy(spritePressed = it)) }
                     }
                     is GamepadElement.MouseButton -> {
                         MouseButtonField(element.button) { onChange(element.copy(button = it)) }
@@ -451,6 +503,9 @@ private fun ElementEditDialog(
                         }) {
                             Text("Hold")
                         }
+
+                        SpriteField("Sprite", element.sprite) { onChange(element.copy(sprite = it, spritePressed = if (it == null) null else element.spritePressed)) }
+                        SpriteField("Pressed sprite", element.spritePressed, enabled = element.sprite != null) { onChange(element.copy(spritePressed = it)) }
                     }
                 }
             }
@@ -651,6 +706,80 @@ private fun GamepadButtonField(button: Int, onChange: (Int) -> Unit) {
                 )
             }
         }
+    }
+}
+
+// One sprite slot of a Key element, styled like the game metadata IconSection: a tappable row with
+// a thumbnail and a "Tap to choose/change" hint, plus a trailing X to remove the image. Picking only
+// writes the file into the pool and updates the in-memory element, deletion of unreferenced files is
+// handled by the sprite sweep on save.
+@Composable
+private fun SpriteField(label: String, fileName: String?, enabled: Boolean = true, onChange: (String?) -> Unit) {
+    val context = LocalContext.current
+    val layoutLibrary = Libraries.loadLayoutLibrary(context)
+    val scope = rememberCoroutineScope()
+    val currentOnChange by rememberUpdatedState(onChange)
+    val pickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val name = withContext(Dispatchers.IO) { importSpriteFromUri(context, layoutLibrary, uri) }
+                if (name != null) currentOnChange(name)
+            }
+        }
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(enabled = enabled) { pickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+            .padding(8.dp)
+            .alpha(if (enabled) 1f else 0.38f)
+    ) {
+        val bitmap = rememberSpriteBitmap(fileName)
+        if (bitmap != null) {
+            Image(bitmap = bitmap, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.size(48.dp))
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = null)
+            }
+        }
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.titleSmall)
+            Text(
+                text = when {
+                    !enabled -> "Set a sprite first"
+                    fileName == null -> "Tap to choose"
+                    else -> "Tap to change"
+                },
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+        if (fileName != null) {
+            IconButton(onClick = { currentOnChange(null) }) {
+                Icon(Icons.Filled.Close, contentDescription = "Remove sprite")
+            }
+        }
+    }
+}
+
+// Decodes the picked image, downscales it to at most 512px on the longest edge and stores it in the sprite pool as PNG
+private fun importSpriteFromUri(context: Context, layoutLibrary: LayoutLibrary, uri: Uri): String? {
+    return try {
+        val source = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) } ?: return null
+        val maxDimension = maxOf(source.width, source.height)
+        val bitmap = if (maxDimension > 512) Bitmap.createScaledBitmap(source, (source.width * 512 / maxDimension).coerceAtLeast(1), (source.height * 512 / maxDimension).coerceAtLeast(1), true) else source
+        val output = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)
+        layoutLibrary.storeSprite(output.toByteArray())
+    } catch (e: Exception) {
+        null
     }
 }
 

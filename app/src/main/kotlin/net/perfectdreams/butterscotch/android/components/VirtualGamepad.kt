@@ -159,6 +159,8 @@ private fun BoxWithConstraintsScope.PlayableGamepad(
                 right = element.right,
                 keys = keys,
                 interactive = true,
+                sprite = element.sprite,
+                spriteThumb = element.spriteThumb,
                 modifier = placement
             )
 
@@ -167,6 +169,8 @@ private fun BoxWithConstraintsScope.PlayableGamepad(
                 device = element.device,
                 keys = keys,
                 interactive = true,
+                sprite = element.sprite,
+                spriteThumb = element.spriteThumb,
                 modifier = placement
             )
 
@@ -176,6 +180,8 @@ private fun BoxWithConstraintsScope.PlayableGamepad(
                 trigger = element.trigger,
                 keys = keys,
                 interactive = true,
+                sprite = element.sprite,
+                spritePressed = element.spritePressed,
                 modifier = placement
             )
 
@@ -185,6 +191,7 @@ private fun BoxWithConstraintsScope.PlayableGamepad(
                     {
                         onMenuOpen.invoke()
                     },
+                    element.sprite,
                     placement
                 )
             }

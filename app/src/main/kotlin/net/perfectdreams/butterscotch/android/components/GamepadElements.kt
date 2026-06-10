@@ -1,16 +1,19 @@
 package net.perfectdreams.butterscotch.android.components
 
+import android.graphics.BitmapFactory
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FastForward
@@ -30,14 +33,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
+import net.perfectdreams.butterscotch.android.Libraries
 import net.perfectdreams.butterscotch.android.VirtualKeyState
 import net.perfectdreams.butterscotch.android.layouts.GamepadElement
 import net.perfectdreams.butterscotch.android.layouts.GamepadStick
@@ -47,18 +58,26 @@ import net.perfectdreams.butterscotch.android.theme.ButterscotchPrimary
 import kotlinx.coroutines.flow.collectLatest
 import kotlin.math.atan2
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 @Composable
 fun MenuButton(
     interactive: Boolean,
     onMenuOpen: () -> (Unit),
+    sprite: String? = null,
     modifier: Modifier = Modifier
 ) {
+    val spriteBitmap = rememberSpriteBitmap(sprite)
     Box(
         modifier = modifier
-            .clip(CircleShape)
-            .background(Color.White.copy(alpha = 0.22f))
+            .then(
+                if (spriteBitmap == null) {
+                    Modifier
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.22f))
+                } else Modifier
+            )
             .pointerInput(Unit) {
                 if (interactive) {
                     awaitEachGesture {
@@ -70,13 +89,22 @@ fun MenuButton(
             },
         contentAlignment = Alignment.Center
     ) {
-        Icon(
-            imageVector = Icons.Default.Menu,
-            contentDescription = "Open menu",
-            tint = Color.White,
-            // The Box is sized by placement (scale * shorter side), so size the glyph as a fraction of it
-            modifier = Modifier.fillMaxSize(0.55f)
-        )
+        if (spriteBitmap != null) {
+            Image(
+                bitmap = spriteBitmap,
+                contentDescription = "Open menu",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Default.Menu,
+                contentDescription = "Open menu",
+                tint = Color.White,
+                // The Box is sized by placement (scale * shorter side), so size the glyph as a fraction of it
+                modifier = Modifier.fillMaxSize(0.55f)
+            )
+        }
     }
 }
 
@@ -89,10 +117,17 @@ fun FastForwardButton(
     onFastForwardRelease: (GamepadElement.FastForward) -> (Unit),
     modifier: Modifier = Modifier
 ) {
+    val spriteBitmap = rememberSpriteBitmap(element.sprite)
+    val spritePressedBitmap = rememberSpriteBitmap(element.spritePressed)
     Box(
         modifier = modifier
-            .clip(CircleShape)
-            .background(if (isActive) ButterscotchPrimary.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.22f))
+            .then(
+                if (spriteBitmap == null) {
+                    Modifier
+                        .clip(CircleShape)
+                        .background(if (isActive) ButterscotchPrimary.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.22f))
+                } else Modifier
+            )
             .pointerInput(Unit) {
                 if (interactive) {
                     awaitEachGesture {
@@ -111,13 +146,23 @@ fun FastForwardButton(
             },
         contentAlignment = Alignment.Center
     ) {
-        Icon(
-            imageVector = Icons.Default.FastForward,
-            contentDescription = "Enable fast forward",
-            tint = Color.White,
-            // The Box is sized by placement (scale * shorter side), so size the glyph as a fraction of it
-            modifier = Modifier.fillMaxSize(0.55f)
-        )
+        if (spriteBitmap != null) {
+            Image(
+                bitmap = if (isActive && spritePressedBitmap != null) spritePressedBitmap else spriteBitmap,
+                contentDescription = "Enable fast forward",
+                contentScale = ContentScale.Fit,
+                colorFilter = if (isActive && spritePressedBitmap == null) ColorFilter.tint(ButterscotchPrimary.copy(alpha = 0.45f), BlendMode.SrcAtop) else null,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Default.FastForward,
+                contentDescription = "Enable fast forward",
+                tint = Color.White,
+                // The Box is sized by placement (scale * shorter side), so size the glyph as a fraction of it
+                modifier = Modifier.fillMaxSize(0.55f)
+            )
+        }
     }
 }
 
@@ -130,10 +175,17 @@ fun MouseButtonOverrideButton(
     onMouseButtonRelease: (GamepadElement.MouseButton) -> (Unit),
     modifier: Modifier = Modifier
 ) {
+    val spriteBitmap = rememberSpriteBitmap(element.sprite)
+    val spritePressedBitmap = rememberSpriteBitmap(element.spritePressed)
     Box(
         modifier = modifier
-            .clip(CircleShape)
-            .background(if (isActive) ButterscotchPrimary.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.22f))
+            .then(
+                if (spriteBitmap == null) {
+                    Modifier
+                        .clip(CircleShape)
+                        .background(if (isActive) ButterscotchPrimary.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.22f))
+                } else Modifier
+            )
             .pointerInput(Unit) {
                 if (interactive) {
                     awaitEachGesture {
@@ -152,17 +204,36 @@ fun MouseButtonOverrideButton(
             },
         contentAlignment = Alignment.Center
     ) {
-        Icon(
-            imageVector = Icons.Default.Mouse,
-            contentDescription = "Enable mouse button",
-            tint = Color.White,
-            // The Box is sized by placement (scale * shorter side), so size the glyph as a fraction of it
-            modifier = Modifier.fillMaxSize(0.55f)
-        )
+        if (spriteBitmap != null) {
+            Image(
+                bitmap = if (isActive && spritePressedBitmap != null) spritePressedBitmap else spriteBitmap,
+                contentDescription = "Enable mouse button",
+                contentScale = ContentScale.Fit,
+                colorFilter = if (isActive && spritePressedBitmap == null) ColorFilter.tint(ButterscotchPrimary.copy(alpha = 0.45f), BlendMode.SrcAtop) else null,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Default.Mouse,
+                contentDescription = "Enable mouse button",
+                tint = Color.White,
+                // The Box is sized by placement (scale * shorter side), so size the glyph as a fraction of it
+                modifier = Modifier.fillMaxSize(0.55f)
+            )
+        }
     }
 }
 
 // ===[ Action Buttons ]===
+
+// Loads a sprite from the layout sprite pool as an ImageBitmap, or null if unset/missing/corrupt
+@Composable
+fun rememberSpriteBitmap(fileName: String?): ImageBitmap? {
+    val context = LocalContext.current
+    return remember(fileName) {
+        fileName?.let { BitmapFactory.decodeFile(Libraries.loadLayoutLibrary(context).spriteFile(it).path)?.asImageBitmap() }
+    }
+}
 
 // A single round action button. The renderer sizes/positions it via [modifier] (which already
 // carries the resolved size, offset, and opacity from the layout), so this only owns its look and
@@ -171,6 +242,10 @@ fun MouseButtonOverrideButton(
 // [type] is currently always Press: hold the binding while the pointer is down. RapidFire is part
 // of the model but not wired yet - it needs a per-frame tick to emit repeat pulses, which the
 // edge-only input pipeline does not have.
+//
+// With a [sprite] set the circle + label is replaced by the image. While pressed we swap to
+// [spritePressed] when present, otherwise tint the sprite's pixels with the same press color flat
+// buttons use.
 @Composable
 fun ActionButton(
     label: String,
@@ -178,14 +253,21 @@ fun ActionButton(
     trigger: KeyTrigger,
     keys: VirtualKeyState,
     interactive: Boolean,
+    sprite: String? = null,
+    spritePressed: String? = null,
     modifier: Modifier = Modifier
 ) {
     var pressed by remember { mutableStateOf(false) }
+    val spriteBitmap = rememberSpriteBitmap(sprite)
+    val spritePressedBitmap = rememberSpriteBitmap(spritePressed)
     Box(
         modifier = modifier
-            .clip(CircleShape)
-            .background(
-                if (pressed) ButterscotchPrimary.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.22f)
+            .then(
+                if (spriteBitmap == null) {
+                    Modifier
+                        .clip(CircleShape)
+                        .background(if (pressed) ButterscotchPrimary.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.22f))
+                } else Modifier
             )
             .pointerInput(binding) {
                 if (interactive) {
@@ -215,11 +297,21 @@ fun ActionButton(
             },
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = label,
-            color = Color.White,
-            style = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        )
+        if (spriteBitmap != null) {
+            Image(
+                bitmap = if (pressed && spritePressedBitmap != null) spritePressedBitmap else spriteBitmap,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                colorFilter = if (pressed && spritePressedBitmap == null) ColorFilter.tint(ButterscotchPrimary.copy(alpha = 0.45f), BlendMode.SrcAtop) else null,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Text(
+                text = label,
+                color = Color.White,
+                style = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            )
+        }
     }
 }
 
@@ -235,6 +327,8 @@ fun ActionButton(
  */
 @Composable
 fun JoystickBase(
+    sprite: String? = null,
+    spriteThumb: String? = null,
     modifier: Modifier = Modifier,
     modifierWithOffset: Modifier.(holdingState: MutableState<Boolean>, thumbOffset: MutableState<Offset>) -> Modifier
 ) {
@@ -242,6 +336,8 @@ fun JoystickBase(
     val thumbOffset = remember { mutableStateOf(Offset.Zero) }
     val holding = remember { mutableStateOf(false) }
     val color = if (holding.value) ButterscotchPrimary else Color.White
+    val baseBitmap = rememberSpriteBitmap(sprite)
+    val thumbBitmap = rememberSpriteBitmap(spriteThumb)
 
     // This is the REAL position of the thumb
     val thumb = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
@@ -255,27 +351,59 @@ fun JoystickBase(
         }
     }
 
+    // With a base sprite the circle clip/background goes away so non-circular art renders as authored.
+    // The gesture math is unaffected, it derives the input zone from min(width, height) on its own
     Box(
         modifier = modifier
-            .clip(CircleShape)
-            .background(color.copy(alpha = 0.18f))
-            .modifierWithOffset(holding, thumbOffset)
+            .then(
+                if (baseBitmap == null) {
+                    Modifier
+                        .clip(CircleShape)
+                        .background(color.copy(alpha = 0.18f))
+                } else Modifier
+            )
+            .modifierWithOffset(holding, thumbOffset),
+        contentAlignment = Alignment.Center
     ) {
+        if (baseBitmap != null) {
+            Image(
+                bitmap = baseBitmap,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
         Canvas(modifier = Modifier.fillMaxSize()) {
             val radius = size.minDimension / 2f
             val center = Offset(size.width / 2f, size.height / 2f)
-            // Outer ring
-            drawCircle(
-                color = color.copy(alpha = 0.35f),
-                radius = radius * 0.95f,
-                center = center,
-                style = Stroke(width = 4f)
-            )
-            // Thumb
-            drawCircle(
-                color = color.copy(alpha = 0.6f),
-                radius = radius * 0.40f,
-                center = center + thumb.value
+            if (baseBitmap == null) {
+                // Outer ring
+                drawCircle(
+                    color = color.copy(alpha = 0.35f),
+                    radius = radius * 0.95f,
+                    center = center,
+                    style = Stroke(width = 4f)
+                )
+            }
+            if (thumbBitmap == null) {
+                // Thumb
+                drawCircle(
+                    color = color.copy(alpha = 0.6f),
+                    radius = radius * 0.40f,
+                    center = center + thumb.value
+                )
+            }
+        }
+        if (thumbBitmap != null) {
+            // Same diameter as the drawn thumb (0.40 * minDimension). The lambda offset keeps the
+            // per-frame finger tracking out of recomposition
+            Image(
+                bitmap = thumbBitmap,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxSize(0.4f)
+                    .offset { IntOffset(thumb.value.x.roundToInt(), thumb.value.y.roundToInt()) }
             )
         }
     }
@@ -296,9 +424,11 @@ fun Joystick(
     right: InputBinding,
     keys: VirtualKeyState,
     interactive: Boolean,
+    sprite: String? = null,
+    spriteThumb: String? = null,
     modifier: Modifier = Modifier
 ) {
-    JoystickBase(modifier) { holding, thumbOffset ->
+    JoystickBase(sprite, spriteThumb, modifier) { holding, thumbOffset ->
         this.pointerInput(up, down, left, right) {
             if (interactive) {
                 awaitEachGesture {
@@ -380,9 +510,11 @@ fun AnalogJoystick(
     device: Int,
     keys: VirtualKeyState,
     interactive: Boolean,
+    sprite: String? = null,
+    spriteThumb: String? = null,
     modifier: Modifier = Modifier
 ) {
-    JoystickBase(modifier) { holding, thumbOffset ->
+    JoystickBase(sprite, spriteThumb, modifier) { holding, thumbOffset ->
         this.pointerInput(stick) {
             if (interactive) {
                 awaitEachGesture {

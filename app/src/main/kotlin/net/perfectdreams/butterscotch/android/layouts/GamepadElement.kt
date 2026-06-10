@@ -30,6 +30,18 @@ sealed class GamepadElement {
      */
     abstract val opacity: Double
 
+    /**
+     * Every sprite file name referenced by this element. The sprite sweep and the layout zip export walk these, so keep this in sync when adding sprite fields to other element types
+     */
+    fun spriteReferences(): List<String> = when (this) {
+        is Key -> listOfNotNull(sprite, spritePressed)
+        is Joystick -> listOfNotNull(sprite, spriteThumb)
+        is AnalogJoystick -> listOfNotNull(sprite, spriteThumb)
+        is Menu -> listOfNotNull(sprite)
+        is FastForward -> listOfNotNull(sprite, spritePressed)
+        is MouseButton -> listOfNotNull(sprite, spritePressed)
+    }
+
     @Serializable
     @SerialName("Key")
     data class Key(
@@ -46,6 +58,12 @@ sealed class GamepadElement {
         val label: String?,
         val trigger: KeyTrigger,
         val binding: InputBinding,
+
+        /**
+         * Custom sprite file names inside the layout sprites pool, see [LayoutLibrary.spriteFile]. [spritePressed] is only meaningful when [sprite] is set
+         */
+        val sprite: String? = null,
+        val spritePressed: String? = null,
     ) : GamepadElement()
 
     @Serializable
@@ -61,6 +79,12 @@ sealed class GamepadElement {
         val down: InputBinding,
         val left: InputBinding,
         val right: InputBinding,
+
+        /**
+         * Custom sprite file names for the base and the thumb knob. Independent of each other, whichever is unset falls back to the default drawn look
+         */
+        val sprite: String? = null,
+        val spriteThumb: String? = null,
     ) : GamepadElement()
 
     @Serializable
@@ -75,6 +99,12 @@ sealed class GamepadElement {
         val stick: GamepadStick,
         /** Which controller slot (0-based) this stick feeds. The on-screen pad is player 1 by default. */
         val device: Int = 0,
+
+        /**
+         * Custom sprite file names for the base and the thumb knob. Independent of each other, whichever is unset falls back to the default drawn look
+         */
+        val sprite: String? = null,
+        val spriteThumb: String? = null,
     ) : GamepadElement()
 
     @Serializable
@@ -86,6 +116,11 @@ sealed class GamepadElement {
         override val positionY: Double,
         override val scale: Double,
         override val opacity: Double,
+
+        /**
+         * Custom sprite file name inside the layout sprites pool. No pressed variant, the menu button has no active state
+         */
+        val sprite: String? = null,
     ) : GamepadElement()
 
     @Serializable
@@ -98,7 +133,13 @@ sealed class GamepadElement {
         override val scale: Double,
         override val opacity: Double,
         val button: GmlMouseButton,
-        val toggle: Boolean
+        val toggle: Boolean,
+
+        /**
+         * Custom sprite file names inside the layout sprites pool. [spritePressed] shows while active and is only meaningful when [sprite] is set
+         */
+        val sprite: String? = null,
+        val spritePressed: String? = null,
     ) : GamepadElement()
 
     @Serializable
@@ -111,6 +152,12 @@ sealed class GamepadElement {
         override val scale: Double,
         override val opacity: Double,
         val speed: Float,
-        val toggle: Boolean
+        val toggle: Boolean,
+
+        /**
+         * Custom sprite file names inside the layout sprites pool. [spritePressed] shows while active and is only meaningful when [sprite] is set
+         */
+        val sprite: String? = null,
+        val spritePressed: String? = null,
     ) : GamepadElement()
 }

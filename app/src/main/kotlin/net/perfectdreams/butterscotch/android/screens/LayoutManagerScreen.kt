@@ -76,15 +76,15 @@ fun LayoutManagerScreen(
     // Held so the CreateDocument callback knows which layout to write once the user picks a destination
     var exportTarget by remember { mutableStateOf<GamepadLayout?>(null) }
 
-    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+    // octet-stream instead of application/zip so SAF providers don't "helpfully" append a .zip extension to the .bslayout name
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         val target = exportTarget
         exportTarget = null
         if (uri == null || target == null) return@rememberLauncherForActivityResult
         scope.launch {
             try {
-                val payload = layoutLibrary.exportToJson(target)
                 withContext(Dispatchers.IO) {
-                    context.contentResolver.openOutputStream(uri)?.use { it.write(payload.toByteArray(Charsets.UTF_8)) } ?: error("Could not open destination")
+                    context.contentResolver.openOutputStream(uri)?.use { layoutLibrary.exportToZip(target, it) } ?: error("Could not open destination")
                 }
                 Toast.makeText(context, "Exported ${target.fancyName}", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
@@ -97,10 +97,10 @@ fun LayoutManagerScreen(
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
             try {
-                val text = withContext(Dispatchers.IO) {
-                    context.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) } ?: error("Could not open file")
+                val bytes = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: error("Could not open file")
                 }
-                val imported = layoutLibrary.importFromJson(text)
+                val imported = layoutLibrary.importFromZip(bytes)
                 Toast.makeText(context, "Imported ${imported.fancyName}", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
                 Toast.makeText(context, "Import failed: ${e.message ?: "invalid layout file"}", Toast.LENGTH_LONG).show()
@@ -113,7 +113,8 @@ fun LayoutManagerScreen(
             ButterscotchTopBar({ Text("Gamepad Layouts") }, nav, navigationIcon = { ButterscotchBackButton(nav) })
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { importLauncher.launch(arrayOf("application/json")) }) {
+            // Wide open filter because shared zips arrive with all sorts of mime types depending on the app that sent them
+            FloatingActionButton(onClick = { importLauncher.launch(arrayOf("*/*")) }) {
                 Icon(Icons.Filled.Add, contentDescription = "Import layout")
             }
         },
@@ -135,7 +136,7 @@ fun LayoutManagerScreen(
                     onExport = {
                         exportTarget = layout
                         val sanitized = layout.fancyName.replace(Regex("[^A-Za-z0-9._-]"), "_")
-                        exportLauncher.launch("$sanitized.json")
+                        exportLauncher.launch("$sanitized.bslayout")
                     },
                 )
             }
