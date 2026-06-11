@@ -28,7 +28,7 @@ import java.util.UUID
  * The entry point of the app!
  */
 @Composable
-fun ButterscotchApp(gameLibrary: GameLibrary, layoutLibrary: LayoutLibrary, settingsStore: SettingsStore) {
+fun ButterscotchApp(gameLibrary: GameLibrary, layoutLibrary: LayoutLibrary, settingsStore: SettingsStore, updateAvailableClickCallback: (() -> (Unit))?) {
     val nav = rememberNavController()
 
     NavHost(
@@ -41,7 +41,7 @@ fun ButterscotchApp(gameLibrary: GameLibrary, layoutLibrary: LayoutLibrary, sett
         popExitTransition = { slideOutOfContainer(SlideDirection.End, tween(250)) },
     ) {
         composable<Route.Launcher> {
-            LauncherScreen(library = gameLibrary, nav = nav)
+            LauncherScreen(library = gameLibrary, nav = nav, updateAvailableClickCallback = updateAvailableClickCallback)
         }
         composable<Route.ImportGame> {
             ImportScreen(library = gameLibrary, layoutLibrary = layoutLibrary, nav = nav)

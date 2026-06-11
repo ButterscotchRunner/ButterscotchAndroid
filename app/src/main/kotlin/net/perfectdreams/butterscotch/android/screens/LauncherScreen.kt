@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
@@ -46,9 +47,19 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -76,6 +87,7 @@ import net.perfectdreams.butterscotch.android.billing.BillingManager
 import net.perfectdreams.butterscotch.android.components.BannerAd
 import net.perfectdreams.butterscotch.android.components.ButterscotchBobImage
 import net.perfectdreams.butterscotch.android.components.ButterscotchTopBar
+import net.perfectdreams.butterscotch.android.components.FrameAnimationImage
 import net.perfectdreams.butterscotch.android.library.GameEntry
 import net.perfectdreams.butterscotch.android.library.GameLibrary
 
@@ -91,13 +103,65 @@ import net.perfectdreams.butterscotch.android.library.GameLibrary
 @Composable
 fun LauncherScreen(
     library: GameLibrary,
-    nav: NavHostController
+    nav: NavHostController,
+    updateAvailableClickCallback: (() -> (Unit))?
 ) {
+    val snackbarHostState = remember { SnackbarHostState() }
+
     val context = LocalContext.current
     val billing = remember { BillingManager.getInstance(context) }
     var menuExpanded by remember { mutableStateOf(false) }
 
+    val _updateAvailableClickCallback = updateAvailableClickCallback
+    if (_updateAvailableClickCallback != null) {
+        LaunchedEffect(_updateAvailableClickCallback) {
+            val result = snackbarHostState.showSnackbar(
+                message = "Update Available!",
+                actionLabel = "Update",
+                duration = SnackbarDuration.Indefinite
+            )
+
+            if (result == SnackbarResult.ActionPerformed) {
+                _updateAvailableClickCallback()
+            }
+        }
+    }
+
     Scaffold(
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState) { data ->
+                // Keyed by data so a new snackbar doesn't reuse the already-swiped-away state of the previous one
+                key(data) {
+                    val dismissState = rememberSwipeToDismissBoxState()
+                    SwipeToDismissBox(
+                        state = dismissState,
+                        backgroundContent = {},
+                        onDismiss = { data.dismiss() }
+                    ) {
+                        Snackbar(
+                            modifier = Modifier.padding(12.dp),
+                            containerColor = Color(0xFF2B2B2B),
+                            contentColor = Color.White,
+                            actionContentColor = MaterialTheme.colorScheme.primary,
+                            action = {
+                                val actionLabel = data.visuals.actionLabel
+                                if (actionLabel != null) {
+                                    TextButton(onClick = { data.performAction() }) {
+                                        Text(actionLabel)
+                                    }
+                                }
+                            }
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                FrameAnimationImage(listOf(R.drawable.update_1, R.drawable.update_2), 500, "Update Image", 8, 8, 3)
+                                Spacer(Modifier.width(8.dp))
+                                Text(data.visuals.message)
+                            }
+                        }
+                    }
+                }
+            }
+        },
         topBar = {
             ButterscotchTopBar(
                 title = {
