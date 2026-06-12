@@ -9,4 +9,6 @@ data class ButterscotchSettings(
     val enableHapticFeedback: Boolean = true,
     // Vibration strength as a 10..100 percentage (the UI clamps the minimum to 10)
     val hapticStrength: Int = 100,
+    val hideVirtualGamepadWhenUsingPhysicalController: Boolean = true,
+    val hideVirtualGamepadWhenUsingPhysicalKeyboard: Boolean = true,
 )

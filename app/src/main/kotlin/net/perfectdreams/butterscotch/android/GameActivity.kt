@@ -18,14 +18,11 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -40,7 +37,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerId
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.viewinterop.AndroidView
 import net.perfectdreams.butterscotch.android.components.FreeCameraOverlay
@@ -57,7 +53,6 @@ import net.perfectdreams.butterscotch.android.library.GameLibrary
 import net.perfectdreams.butterscotch.android.settings.SettingsStore
 import net.perfectdreams.butterscotch.android.theme.ButterscotchAndroidTheme
 import java.io.File
-import java.security.MessageDigest
 import java.util.UUID
 import java.util.zip.CRC32
 
@@ -80,6 +75,7 @@ class GameActivity : ComponentActivity() {
     lateinit var layoutLibrary: LayoutLibrary
     lateinit var settingsStore: SettingsStore
     lateinit var haptics: Haptics
+    var isVirtualKeysVisible by mutableStateOf<Boolean>(true)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -216,6 +212,7 @@ class GameActivity : ComponentActivity() {
                                 awaitPointerEventScope {
                                     while (true) {
                                         val event = awaitPointerEvent()
+                                        this@GameActivity.isVirtualKeysVisible = true
 
                                         for (change in event.changes) {
                                             if (change.pressed != change.previousPressed) {
@@ -371,7 +368,7 @@ class GameActivity : ComponentActivity() {
                             LayoutMode.Overlay -> {
                                 Box(Modifier.fillMaxSize()) {
                                     gameSurface(Modifier.fillMaxSize())
-                                    if (!freeCam.active) {
+                                    if (!freeCam.active && isVirtualKeysVisible) {
                                         GameControls(
                                             layout = layout,
                                             editModeState = editorState,
@@ -403,7 +400,7 @@ class GameActivity : ComponentActivity() {
                                         gameSurface(Modifier.fillMaxSize())
                                     }
 
-                                    if (!freeCam.active) {
+                                    if (!freeCam.active && isVirtualKeysVisible) {
                                         GameControls(
                                             layout = layout,
                                             editModeState = editorState,
@@ -546,12 +543,18 @@ class GameActivity : ComponentActivity() {
         val runner = this.butterscotchRunner ?: return false
 
         // We return true here so that gamepad keypresses don't bubble up to Compose
-        if (runner.enablePhysicalControllers && runner.gamepadRouter.handleKeyEvent(event))
+        if (runner.enablePhysicalControllers && runner.gamepadRouter.handleKeyEvent(event)) {
+            if (this.settingsStore.settings.hideVirtualGamepadWhenUsingPhysicalController)
+                this.isVirtualKeysVisible = false
             return true
+        }
 
         // Same idea for a physical keyboard: consume it so it doesn't reach Compose
-        if (runner.enablePhysicalKeyboard && runner.keyboardRouter.handleKeyEvent(event))
+        if (runner.enablePhysicalKeyboard && runner.keyboardRouter.handleKeyEvent(event)) {
+            if (this.settingsStore.settings.hideVirtualGamepadWhenUsingPhysicalKeyboard)
+                this.isVirtualKeysVisible = false
             return true
+        }
 
         return super.dispatchKeyEvent(event)
     }

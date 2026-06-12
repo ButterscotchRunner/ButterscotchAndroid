@@ -1,14 +1,12 @@
 package net.perfectdreams.butterscotch.android.screens
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.VideogameAsset
@@ -24,10 +22,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
-import net.perfectdreams.butterscotch.android.R
 import net.perfectdreams.butterscotch.android.Route
 import net.perfectdreams.butterscotch.android.components.ButterscotchBackButton
 import net.perfectdreams.butterscotch.android.components.ButterscotchTopBar
@@ -80,6 +76,34 @@ fun GeneralSettingsScreen(
                             // 10..100 in steps of 10 = 10 stops, which is 8 ticks between the endpoints
                             steps = 8,
                         )
+                    }
+
+                    HorizontalDivider()
+                }
+            }
+
+            item {
+                Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)) {
+                    InputToggle(
+                        "Hide Virtual Gamepad when using a physical controller",
+                        "When enabled, the virtual gamepad will automatically hide when a key is pressed on a physical controller. The virtual gamepad will reappear when touching the screen.",
+                        settings.hideVirtualGamepadWhenUsingPhysicalController
+                    ) { enabled ->
+                        settingsStore.update { copy(hideVirtualGamepadWhenUsingPhysicalController = enabled) }
+                    }
+
+                    HorizontalDivider()
+                }
+            }
+
+            item {
+                Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)) {
+                    InputToggle(
+                        "Hide Virtual Gamepad when using a physical keyboard",
+                        "When enabled, the virtual gamepad will automatically hide when a key is pressed on a physical keyboard. The virtual gamepad will reappear when touching the screen.",
+                        settings.hideVirtualGamepadWhenUsingPhysicalKeyboard
+                    ) { enabled ->
+                        settingsStore.update { copy(hideVirtualGamepadWhenUsingPhysicalKeyboard = enabled) }
                     }
 
                     HorizontalDivider()
