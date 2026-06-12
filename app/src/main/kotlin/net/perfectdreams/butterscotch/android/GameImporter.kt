@@ -138,7 +138,8 @@ object GameImporter {
             return@withContext Result.Failure("Couldn't extract ZIP: ${e.message}")
         }
 
-        val wadFile = temp.walkTopDown().firstOrNull { it.isFile && it.name in WAD_FILENAMES }
+        // Prefer the shallowest WAD, so a root data.win beats one nested inside a subfolder
+        val wadFile = temp.walkTopDown().filter { it.isFile && it.name in WAD_FILENAMES }.minByOrNull { it.relativeTo(temp).invariantSeparatorsPath.count { c -> c == '/' } }
         if (wadFile == null) {
             temp.deleteRecursively()
             library.discardStaging(staged)
@@ -184,7 +185,8 @@ object GameImporter {
             return@withContext Result.Failure("Couldn't extract ZIP: ${e.message}")
         }
 
-        val wadFile = temp.walkTopDown().firstOrNull { it.isFile && it.name in WAD_FILENAMES }
+        // Prefer the shallowest WAD, so a root data.win beats one nested inside a subfolder
+        val wadFile = temp.walkTopDown().filter { it.isFile && it.name in WAD_FILENAMES }.minByOrNull { it.relativeTo(temp).invariantSeparatorsPath.count { c -> c == '/' } }
         if (wadFile == null) {
             temp.deleteRecursively()
             library.discardStaging(staged)
