@@ -563,8 +563,11 @@ class GameActivity : ComponentActivity() {
         val runner = this.butterscotchRunner ?: return false
 
         // We return true here so that gamepad keypresses don't bubble up to Compose
-        if (runner.enablePhysicalControllers && runner.gamepadRouter.handleMotionEvent(event))
+        if (runner.enablePhysicalControllers && runner.gamepadRouter.handleMotionEvent(event)) {
+            if (this.settingsStore.settings.hideVirtualGamepadWhenUsingPhysicalController)
+                this.isVirtualKeysVisible = false
             return true
+        }
 
         return super.dispatchGenericMotionEvent(event)
     }
