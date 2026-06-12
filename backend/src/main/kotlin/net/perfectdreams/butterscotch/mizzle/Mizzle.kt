@@ -135,8 +135,8 @@ class Mizzle(val config: MizzleConfig, val database: Database) {
     }
 
     // The secret rotating salt is what makes this private, without it the small IP + device input space could be brute forced to deanonymize visitors
-    fun generateIdentifier(salt: String, ip: String): String {
-        val input = "$salt|$ip"
+    fun generateIdentifier(salt: String, ip: String, deviceModel: String): String {
+        val input = "$salt|$ip|$deviceModel"
         return MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
     }
 
