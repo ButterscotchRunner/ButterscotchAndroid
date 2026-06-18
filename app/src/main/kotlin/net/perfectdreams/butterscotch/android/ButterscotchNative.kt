@@ -112,6 +112,14 @@ object ButterscotchNative {
     external fun dataWinGmsVersion(handle: Long): String
     external fun dataWinDetectedGmsVersion(handle: Long): String
     external fun getRunningDataWinHandle(): Long
+    external fun getRunnerFrameCount(): Long
+    external fun getProfilerStartedAtFrame(): Long
+    external fun isProfilerEnabled(): Boolean
+    external fun setProfilerEnabled(enabled: Boolean)
+    external fun getProfilerEntriesCount(): Long
+    external fun getProfilerEntryKey(index: Long): String
+    external fun getProfilerEntryNanos(index: Long): Long
+    external fun getProfilerEntryOps(index: Long): Long
 
     // ===[ Render-side JNI — all must run on the EGL-owning thread ]===
 

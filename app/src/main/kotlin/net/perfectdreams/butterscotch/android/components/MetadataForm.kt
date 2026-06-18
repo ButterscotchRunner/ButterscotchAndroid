@@ -283,35 +283,6 @@ private fun OsDropdown(
     }
 }
 
-// Labeled on/off switch row for a physical-input source (controllers, keyboard). Staged and
-// committed by the host screen like the other fields. Off is an escape hatch for games that misbehave when
-// that input is attached (e.g. ones that auto-switch to a console UI when a controller appears).
-@Composable
-fun InputToggle(
-    title: String,
-    subtitle: String?,
-    checked: Boolean,
-    onChange: (Boolean) -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth().toggleable(checked, onValueChange = onChange),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title)
-            if (subtitle != null) {
-                Text(
-                    text = subtitle,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-        }
-
-        Switch(checked = checked, onCheckedChange = null)
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PostProcessingSection(

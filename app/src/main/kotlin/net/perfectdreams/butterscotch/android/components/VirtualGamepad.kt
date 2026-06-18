@@ -10,20 +10,23 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -44,13 +47,14 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -60,15 +64,18 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import net.perfectdreams.butterscotch.android.ButterscotchNative
+import net.perfectdreams.butterscotch.android.ColorUtils
+import net.perfectdreams.butterscotch.android.R
 import net.perfectdreams.butterscotch.android.VirtualKeyState
-import java.util.UUID
 import net.perfectdreams.butterscotch.android.layouts.Gamepad
 import net.perfectdreams.butterscotch.android.layouts.GamepadElement
 import net.perfectdreams.butterscotch.android.layouts.GamepadLayout
@@ -77,6 +84,7 @@ import net.perfectdreams.butterscotch.android.layouts.InputBinding
 import net.perfectdreams.butterscotch.android.library.GameEntry
 import net.perfectdreams.butterscotch.android.screens.GameLogContent
 import java.io.File
+import java.util.UUID
 
 /**
  * Just the on-screen gameplay controls (joystick + action buttons), no menu. Renders into whatever
@@ -316,6 +324,7 @@ private fun BoxScope.MenuSidebar(
     var isRoomWarpMenuOpen by remember { mutableStateOf(false) }
     var isSettingsOpen by remember { mutableStateOf(false) }
     var isLogsOpen by remember { mutableStateOf(false) }
+    var isGMLProfilerOpen by remember { mutableStateOf(false) }
 
     if (isRoomWarpMenuOpen) {
         var roomNameFilter by remember { mutableStateOf("") }
@@ -471,6 +480,10 @@ private fun BoxScope.MenuSidebar(
                     isLogsOpen = true
                 })
 
+                MenuItem(label = "GML Profiler", onClick = {
+                    isGMLProfilerOpen = true
+                })
+
                 Text(
                     text = "Virtual Gamepad",
                     color = MaterialTheme.colorScheme.primary,
@@ -524,6 +537,11 @@ private fun BoxScope.MenuSidebar(
         open = isLogsOpen,
         onDismiss = { isLogsOpen = false },
         logsDir = logsDir
+    )
+
+    GMLProfilerOverlay(
+        open = isGMLProfilerOpen,
+        onDismiss = { isGMLProfilerOpen = false }
     )
 }
 
@@ -687,7 +705,201 @@ private fun LogsOverlay(
                 )
             }
         ) { innerPadding ->
-            GameLogContent(logsDir, Modifier.fillMaxSize().padding(innerPadding))
+            GameLogContent(logsDir, Modifier
+                .fillMaxSize()
+                .padding(innerPadding))
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GMLProfilerOverlay(
+    open: Boolean,
+    onDismiss: () -> Unit
+) {
+    BackHandler(enabled = open) {
+        onDismiss()
+    }
+
+    AnimatedVisibility(
+        visible = open,
+        enter = slideInHorizontally(initialOffsetX = { it }),
+        exit = slideOutHorizontally(targetOffsetX = { it }),
+        modifier = Modifier.fillMaxSize()
+    ) {
+        // Scaffold is backed by a Surface, so it also blocks touches from falling through to the
+        // game and the virtual gamepad controls underneath
+        Scaffold(
+            topBar = {
+                // Same colors as ButterscotchTopBar, which we can't use directly here because it
+                // wants a NavHostController and GameActivity has no Compose navigation
+                TopAppBar(
+                    title = { Text("GML Profiler") },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
+                    navigationIcon = {
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    }
+                )
+            }
+        ) { innerPadding ->
+            data class ProfileEntry(
+                val name: String,
+                val nanos: Long,
+                val ops: Long,
+            )
+
+            val profileEntries = remember { mutableStateListOf<ProfileEntry>() }
+            var profilerEnabled by remember { mutableStateOf(false) }
+            var profilerEnabledOnThisScreen by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) {
+                profilerEnabled = ButterscotchNative.isProfilerEnabled()
+
+                if (profilerEnabled) {
+                    val count = ButterscotchNative.getProfilerEntriesCount()
+                    repeat(count.toInt()) {
+                        profileEntries.add(
+                            ProfileEntry(
+                                ButterscotchNative.getProfilerEntryKey(it.toLong()),
+                                ButterscotchNative.getProfilerEntryNanos(it.toLong()),
+                                ButterscotchNative.getProfilerEntryOps(it.toLong())
+                            )
+                        )
+                    }
+                }
+            }
+            val frameCount = ButterscotchNative.getRunnerFrameCount() - ButterscotchNative.getProfilerStartedAtFrame()
+
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp)
+            ) {
+                item {
+                    InputToggle(
+                        title = "Enable GML Profiler",
+                        subtitle = "The GML profiler tracks how much time each game script is taking. Useful to track down performance issues.",
+                        checked = profilerEnabled,
+                        onChange = {
+                            profilerEnabledOnThisScreen = true
+                            profilerEnabled = it
+                            ButterscotchNative.setProfilerEnabled(it)
+                        },
+                    )
+
+
+                    Spacer(Modifier.height(16.dp))
+
+                    HorizontalDivider()
+
+                    Spacer(Modifier.height(16.dp))
+                }
+
+                if (profilerEnabled) {
+                    val sum = profileEntries.sumOf { it.nanos }
+
+                    val safeFrames = frameCount.coerceAtLeast(1).toDouble()
+                    val targetHz = ButterscotchNative.getTargetFrameHz()
+                    val budgetMs = if (targetHz > 0) 1000.0 / targetHz else 0.0
+                    val totalPerFrameMs = (sum / 1000000.0) / safeFrames
+                    val budgetFraction = if (budgetMs > 0) (totalPerFrameMs / budgetMs) else 0.0
+                    val sortedEntries = profileEntries.sortedByDescending { it.nanos }
+
+                    if (profileEntries.isNotEmpty() && !profilerEnabledOnThisScreen) {
+                        item {
+                            Text("Results over $frameCount frames", style = MaterialTheme.typography.titleMedium)
+
+                            Text("Total GML script time".format(totalPerFrameMs), fontWeight = FontWeight.Bold)
+                            if (budgetMs > 0)
+                                Text("%.2fms of the %.2fms budget".format(totalPerFrameMs, budgetMs), style = MaterialTheme.typography.labelSmall)
+
+                            ProgressBar(budgetFraction.coerceIn(0.0, 1.0).toFloat())
+
+                            Spacer(Modifier.height(16.dp))
+
+                            HorizontalDivider()
+                        }
+
+                        items(sortedEntries, key = { it.name }) { entry ->
+                            Spacer(Modifier.height(16.dp))
+
+                            val percentage = if (sum > 0) entry.nanos / sum.toFloat() else 0f
+
+                            Text(entry.name, fontWeight = FontWeight.Black)
+
+                            val perFrameMs = (entry.nanos / 1000000.0) / safeFrames
+                            val opsPerFrame = entry.ops / safeFrames
+                            val nsPerOp = if (entry.ops > 0) entry.nanos / entry.ops.toDouble() else 0.0
+
+                            Text("%.2fms %.0f ops (%.0f ns/op)".format(perFrameMs, opsPerFrame, nsPerOp), style = MaterialTheme.typography.labelSmall)
+
+                            ProgressBar(percentage)
+
+                            Spacer(Modifier.height(16.dp))
+
+                            HorizontalDivider()
+                        }
+                    } else {
+                        item {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                FrameAnimationImage(
+                                    listOf(R.drawable.fire),
+                                    100L,
+                                    "Fire",
+                                    11,
+                                    14,
+                                    4
+                                )
+
+                                Spacer(Modifier.height(8.dp))
+
+                                Text(
+                                    "Profiler results will appear here after you resume playing the game.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ProgressBar(percentage: Float) {
+    val blended = ColorUtils.lerp(Color.Green, Color.Red, percentage)
+
+    val hsb = ColorUtils.RGBtoHSB((blended.red * 255).toInt(), (blended.green * 255).toInt(), (blended.blue * 255).toInt(), null)
+    val backgroundRGB = ColorUtils.HSBtoRGB(hsb[0], hsb[1], hsb[2] / 4)
+
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(8.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(Color(backgroundRGB)) // the "track"
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(percentage)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(blended) // the "bar"
+            )
+        }
+
+        Box(modifier = Modifier.requiredWidth(32.dp)) {
+            Text("%.1f%%".format(percentage), style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center)
         }
     }
 }
